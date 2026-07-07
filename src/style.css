@@ -1,0 +1,192 @@
+:root {
+  --ink: rgba(226, 238, 248, 0.92);
+  --ink-2: rgba(226, 238, 248, 0.55);
+  --ink-3: rgba(226, 238, 248, 0.32);
+  --panel: rgba(8, 14, 26, 0.55);
+  --accent: #7fe3e0;
+  font-family: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body { height: 100%; overflow: hidden; background: #04070f; }
+
+#sea {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  display: block;
+  cursor: crosshair;
+}
+
+.hud { position: fixed; color: var(--ink); z-index: 2; user-select: none; -webkit-user-select: none; }
+
+/* --- タイトル --- */
+.hud-title {
+  top: 2.2rem;
+  left: 2.4rem;
+  pointer-events: none;
+}
+.hud-title h1 {
+  font-size: clamp(1.8rem, 4vw, 3.2rem);
+  font-weight: 500;
+  letter-spacing: 0.3em;
+  text-shadow: 0 0 24px rgba(0, 0, 0, 0.8);
+}
+.hud-title #area-sub {
+  font-family: Georgia, serif;
+  font-style: italic;
+  font-size: 0.85rem;
+  color: var(--ink-2);
+  letter-spacing: 0.18em;
+  margin-top: 0.4rem;
+}
+.site-name {
+  margin-top: 1.1rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.45em;
+  color: var(--ink-3);
+}
+
+/* --- 海域チップ --- */
+.hud-areas {
+  top: 2.2rem;
+  right: 2.4rem;
+  max-width: 15rem;
+}
+#area-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: flex-end; }
+.chip {
+  font-family: inherit;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  color: var(--ink-2);
+  background: var(--panel);
+  border: 1px solid rgba(127, 227, 224, 0.15);
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: color 0.25s, border-color 0.25s;
+}
+.chip:hover { color: var(--ink); border-color: rgba(127, 227, 224, 0.45); }
+.chip.active {
+  color: #0a1420;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* --- 時刻コントロール --- */
+.hud-bottom {
+  left: 50%;
+  bottom: 2rem;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: min(620px, 86vw);
+  background: var(--panel);
+  border: 1px solid rgba(127, 227, 224, 0.12);
+  border-radius: 999px;
+  padding: 0.6rem 1.2rem;
+  backdrop-filter: blur(8px);
+}
+#play {
+  font-family: inherit;
+  background: none;
+  border: none;
+  color: var(--ink);
+  font-size: 0.9rem;
+  cursor: pointer;
+  width: 1.6rem;
+}
+#time-slider {
+  flex: 1;
+  appearance: none;
+  height: 2px;
+  background: rgba(226, 238, 248, 0.25);
+  border-radius: 1px;
+  outline: none;
+  cursor: pointer;
+}
+#time-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px rgba(127, 227, 224, 0.8);
+}
+#time-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+}
+#time-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* --- 凡例 --- */
+.hud-legend {
+  right: 2.4rem;
+  bottom: 2.3rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.7rem;
+  color: var(--ink-2);
+  letter-spacing: 0.1em;
+}
+#legend-ramp { border-radius: 4px; display: block; }
+.legend-label { color: var(--ink-3); }
+.legend-tick { font-variant-numeric: tabular-nums; }
+
+/* --- ステータス・ツールチップ・クレジット --- */
+#status {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.8rem;
+  letter-spacing: 0.3em;
+  color: var(--ink-2);
+  pointer-events: none;
+}
+#tooltip {
+  position: fixed;
+  z-index: 3;
+  background: var(--panel);
+  border: 1px solid rgba(127, 227, 224, 0.25);
+  color: var(--ink);
+  border-radius: 6px;
+  padding: 0.25rem 0.55rem;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  backdrop-filter: blur(6px);
+}
+#tooltip.visible { opacity: 1; }
+.credit {
+  left: 2.4rem;
+  bottom: 2.3rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+  max-width: 40vw;
+}
+.credit a { color: var(--ink-2); text-decoration-color: var(--ink-3); }
+
+@media (max-width: 720px) {
+  .hud-title { top: 1.2rem; left: 1.2rem; }
+  .hud-areas { display: none; }
+  .credit { display: none; }
+  .hud-legend { right: 1.2rem; bottom: 5.6rem; }
+}
