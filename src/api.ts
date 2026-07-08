@@ -66,6 +66,49 @@ export function toMsilTime(d: Date): string {
   );
 }
 
+/** Date → YYYYMMDD（JST） */
+export function toMsilDate(d: Date): string {
+  return toMsilTime(d).slice(0, 8);
+}
+
+export interface TideStation {
+  code: string;
+  nameJa: string;
+  nameEn: string;
+  lon: number;
+  lat: number;
+}
+
+export async function fetchTideStations(): Promise<TideStation[]> {
+  const gj = await msilFetch("/tide-prediction/v3/station");
+  return gj.features.map((f: any): TideStation => ({
+    code: f.properties.stationCode,
+    nameJa: f.properties.nameJa,
+    nameEn: f.properties.nameEn,
+    lon: f.geometry.coordinates[0],
+    lat: f.geometry.coordinates[1],
+  }));
+}
+
+export interface TideDay {
+  /** 潮位[cm]。1分間隔で1日分（1440個） */
+  tide: number[];
+  min: number;
+  max: number;
+}
+
+export async function fetchTideDay(stationCode: string, date: string): Promise<TideDay> {
+  const d = await msilFetch("/tide-prediction/v3/data", { stationCode, date });
+  const tide: number[] = d.tide ?? [];
+  let min = Infinity;
+  let max = -Infinity;
+  for (const v of tide) {
+    if (v < min) min = v;
+    if (v > max) max = v;
+  }
+  return { tide, min, max };
+}
+
 export async function fetchCurrents(areaCode: string, time: Date): Promise<CurrentSample[]> {
   const gj = await msilFetch("/tidal-current-prediction/v3/data", {
     areaCode,
@@ -79,21 +122,33 @@ export async function fetchCurrents(areaCode: string, time: Date): Promise<Curre
   }));
 }
 
+/**
+ * v2系API（ArcGIS REST形式）の汎用クエリ。
+ * pathは "depth-contour/v2" のようにバージョンまで含める。
+ */
+export async function arcgisQuery(
+  path: string,
+  layer: number,
+  bbox: [number, number, number, number],
+  extra?: Record<string, string>
+): Promise<any> {
+  const [xmin, ymin, xmax, ymax] = bbox;
+  return msilFetch(`/${path}/MapServer/${layer}/query`, {
+    f: "geojson",
+    geometry: JSON.stringify({ xmin, ymin, xmax, ymax }),
+    geometryType: "esriGeometryEnvelope",
+    inSR: "4326",
+    outFields: "*",
+    returnGeometry: "true",
+    ...extra,
+  });
+}
+
 /** 等深線（20m/50m/100m/150m/200m 層）を海域bboxで取得 */
 export async function fetchContours(bbox: [number, number, number, number]): Promise<ContourLine[]> {
-  const [xmin, ymin, xmax, ymax] = bbox;
   const layers = [10, 11, 12, 13, 14];
   const results = await Promise.allSettled(
-    layers.map((layer) =>
-      msilFetch(`/depth-contour/v2/MapServer/${layer}/query`, {
-        f: "geojson",
-        geometry: JSON.stringify({ xmin, ymin, xmax, ymax }),
-        geometryType: "esriGeometryEnvelope",
-        inSR: "4326",
-        outFields: "Depth",
-        returnGeometry: "true",
-      })
-    )
+    layers.map((layer) => arcgisQuery("depth-contour/v2", layer, bbox, { outFields: "Depth" }))
   );
   const lines: ContourLine[] = [];
   for (const r of results) {

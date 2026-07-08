@@ -5,6 +5,9 @@ import {
 } from "./api";
 import { VectorField } from "./field";
 import { buildLandMask, type LandMask } from "./landmask";
+import { mountNav } from "./nav";
+
+mountNav("nagare");
 import { FlowRenderer, speedColor } from "./render";
 import { TIME_SPAN_BACK_H, TIME_SPAN_FWD_H, TIME_STEP_MIN } from "./config";
 

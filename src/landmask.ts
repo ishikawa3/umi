@@ -9,10 +9,10 @@ const TILE_URL = (z: number, x: number, y: number) =>
   `https://cyberjapandata.gsi.go.jp/xyz/pale/${z}/${x}/${y}.png`;
 const TILE = 256;
 
-function lonToX(lon: number, z: number): number {
+export function lonToX(lon: number, z: number): number {
   return ((lon + 180) / 360) * 2 ** z * TILE;
 }
-function latToY(lat: number, z: number): number {
+export function latToY(lat: number, z: number): number {
   const r = (lat * Math.PI) / 180;
   return ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * 2 ** z * TILE;
 }
@@ -20,12 +20,31 @@ function latToY(lat: number, z: number): number {
 export class LandMask {
   constructor(
     private data: Uint8Array, // 1 = 水域
-    private w: number,
-    private h: number,
-    private px0: number, // マスク原点のグローバルピクセル座標（zoom z）
-    private py0: number,
-    private z: number
+    readonly w: number,
+    readonly h: number,
+    readonly px0: number, // マスク原点のグローバルピクセル座標（zoom z）
+    readonly py0: number,
+    readonly z: number
   ) {}
+
+  /** 陸を指定色で塗った画像（水域は透明）。広域ページの背景シルエット用 */
+  landImage(r: number, g: number, b: number, a: number): HTMLCanvasElement {
+    const c = document.createElement("canvas");
+    c.width = this.w;
+    c.height = this.h;
+    const ctx = c.getContext("2d")!;
+    const img = ctx.createImageData(this.w, this.h);
+    for (let i = 0; i < this.data.length; i++) {
+      if (this.data[i] === 0) {
+        img.data[i * 4] = r;
+        img.data[i * 4 + 1] = g;
+        img.data[i * 4 + 2] = b;
+        img.data[i * 4 + 3] = a;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    return c;
+  }
 
   isWater(lon: number, lat: number): boolean {
     const x = Math.floor(lonToX(lon, this.z) - this.px0);
@@ -89,9 +108,9 @@ export async function buildLandMask(
     const lonSpan = x1 - x0 + padLon * 2;
     // マスク幅が1400px程度になるズームを選び、大きすぎる場合は1段ずつ下げる
     let z = Math.round(Math.log2(((360 / lonSpan) * 1400) / TILE));
-    z = Math.max(9, Math.min(14, z));
+    z = Math.max(5, Math.min(14, z));
     let px0 = 0, px1 = 0, py0 = 0, py1 = 0, w = 0, h = 0;
-    for (; z >= 9; z--) {
+    for (; z >= 5; z--) {
       px0 = Math.floor(lonToX(x0 - padLon, z));
       px1 = Math.ceil(lonToX(x1 + padLon, z));
       py0 = Math.floor(latToY(y1 + padLat, z)); // 北がy小
