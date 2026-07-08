@@ -37,6 +37,7 @@ function cleanDescription(html: string): string {
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
+    .replace(/^\s*[［\[].*?[］\]]\s*$/gm, "") // リンク由来の「[利用上の制限事項]」等
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
