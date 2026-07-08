@@ -128,8 +128,8 @@ function drawCurve() {
   const H = canvas.height;
   const x0 = W * 0.08;
   const x1 = W * 0.92;
-  const y0 = H * 0.78;
-  const y1 = H * 0.955;
+  const y0 = H * 0.72;
+  const y1 = H * 0.9;
   const X = (minute: number) => x0 + (minute / (MINUTES - 1)) * (x1 - x0);
   const Y = (cm: number) => {
     const t = (cm - d.min) / (d.max - d.min || 1);
@@ -164,7 +164,9 @@ function drawCurve() {
     const minute = (ex.i / d.tide.length) * MINUTES;
     const px = X(minute);
     const py = Y(d.tide[ex.i]);
-    ctx.fillText(`${fmtMinute(minute)}  ${d.tide[ex.i]}cm`, px, py + (ex.kind === "high" ? -8 : 14) * map.dpr);
+    // 画面下端に近い干潮ラベルはクレジットと重なるため点の上へ逃がす
+    const below = ex.kind === "low" && py + 20 * map.dpr < H * 0.93;
+    ctx.fillText(`${fmtMinute(minute)}  ${d.tide[ex.i]}cm`, px, py + (below ? 14 : -8) * map.dpr);
   }
 
   // 現在時刻の点
@@ -249,10 +251,11 @@ canvas.addEventListener("click", async (ev) => {
 });
 
 canvas.addEventListener("pointermove", (ev) => {
-  // 曲線の上では時刻と潮位、地点の上では地点名を出す
+  // 地点の上では地点名、（地点がなければ）曲線の帯では時刻と潮位を出す
+  const s = nearestStation(ev.clientX, ev.clientY, 16);
   const d = selected ? tideCache.get(selected.code) : undefined;
   const yCss = ev.clientY * map.dpr;
-  if (d && yCss > canvas.height * 0.76) {
+  if (!s && d && yCss > canvas.height * 0.7) {
     const x0 = canvas.width * 0.08;
     const x1 = canvas.width * 0.92;
     const t = (ev.clientX * map.dpr - x0) / (x1 - x0);
@@ -265,7 +268,6 @@ canvas.addEventListener("pointermove", (ev) => {
       return;
     }
   }
-  const s = nearestStation(ev.clientX, ev.clientY, 16);
   if (s) {
     const sd = tideCache.get(s.code);
     tooltip.classList.add("visible");
