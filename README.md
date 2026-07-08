@@ -1,27 +1,25 @@
-# うみ — 潮流のかたち
+# うみ — 海しるAPIでみる日本の海
+
+**https://ishikawa3.github.io/umi/**
 
 海上保安庁「[海しる](https://portal.msil.go.jp/)」（海洋状況表示システム）の公開APIを使った、
-日本沿岸の潮流のリアルタイム・フローフィールド作品。
+日本の海のデータアート集。フレームワークなしの Vite + TypeScript + Canvas 2D。
 
-数千のパーティクルが、実際の潮流推算値（流向・流速）に沿って泳ぎます。
-時刻スライダーで潮の転流を眺めたり、再生モードで24時間の潮汐サイクルを早回しできます。
+| 作品 | 内容 | 主なAPI |
+|---|---|---|
+| [ながれ](https://ishikawa3.github.io/umi/) | 潮流のフローフィールド。数千の粒子が実際の流向・流速で泳ぐ | 潮流推算 v3 |
+| [くろしお](https://ishikawa3.github.io/umi/kuroshio.html) | 黒潮・対馬暖流・宗谷暖流の流軸を流れる光 | 海洋速報 v2 |
+| [しおどき](https://ishikawa3.github.io/umi/tide.html) | 全国の検潮所が潮位で明滅する「呼吸する日本地図」＋潮位曲線 | 潮汐推算 v3 |
+| [こえ](https://ishikawa3.github.io/umi/koe.html) | 航行警報 — いま海で起きていることば | 航行警報 v2 |
 
-## 使用API
+共通の道具立て:
 
-| API | 用途 |
-|---|---|
-| 潮流推算 v3 (`/tidal-current-prediction/v3`) | 海域ごとの推算地点の流向・流速（フローフィールドの実体） |
-| 等深線 v2 (`/depth-contour/v2`) | 背景の海底地形線（20/50/100/150/200m） |
-
-さらに[国土地理院 淡色地図タイル](https://maps.gsi.go.jp/development/ichiran.html)から
-水域マスクを生成し（海色 rgb(190,210,255) をピクセル判定＋クロージングで穴埋め）、
-陸に入った粒子を消している（`src/landmask.ts`）。海しるAPI自体は陸のデータを持たないため。
-
-- 認証は `Ocp-Apim-Subscription-Key` ヘッダー。`src/config.ts` のキーはポータル公開の**試用キー**
-  （予告なく停止されうる）。継続運用時は[利用方法](https://portal.msil.go.jp/howtouse)から個別キーを申請して差し替える。
-- APIは `access-control-allow-origin: *` を返すため、静的ホスティングのみで動作する（サーバー不要）。
-- 時刻パラメータは `YYYYMMDDhhmm`（JST）。
-- 来島海峡（S01）は約1万点の高密度グリッドで最大2.5kt。他海域は数十点の疎な推算地点。
+- `src/api.ts` — 海しるAPIクライアント（429リトライ・v2 ArcGIS形式の汎用クエリ）
+- `src/landmask.ts` — [国土地理院 淡色地図タイル](https://maps.gsi.go.jp/development/ichiran.html)の
+  海色判定から水域マスク／陸シルエットを生成（海しるは陸のデータを持たないため）
+- `src/japanmap.ts` — 日本全域ページ共通のメルカトル投影＋背景
+- `src/render.ts` — 単一色相シーケンシャルランプと粒子描画
+- 等深線 v2 — ながれページの海底地形の背景線
 
 ## 開発
 
@@ -31,6 +29,12 @@ npm run dev      # 開発サーバー
 npm run build    # dist/ に静的ビルド
 ```
 
+mainにpushするとGitHub Actionsで自動デプロイ。認証は `Ocp-Apim-Subscription-Key`
+ヘッダー。`src/config.ts` のキーはポータル公開の**試用キー**（予告なく停止されうる）。
+継続運用時は[利用方法](https://portal.msil.go.jp/howtouse)から個別キーを申請して差し替える。
+
+拡張の設計は `docs/PLAN.md`（第1期・完了）と `docs/PLAN2.md`（第2期）に。
+
 ## 注意
 
-推算値は鑑賞・学習用。航海には海上保安庁刊行「書誌第781号 潮汐表」を使用のこと（API利用規約より）。
+推算値・速報は鑑賞用。航海には海上保安庁刊行の潮汐表・海図・水路通報を使用のこと（API利用規約より）。
