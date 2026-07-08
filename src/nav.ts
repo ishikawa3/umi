@@ -5,6 +5,7 @@ const PAGES = [
   { id: "kuroshio", title: "くろしお", href: "./kuroshio.html" },
   { id: "shiodoki", title: "しおどき", href: "./tide.html" },
   { id: "koe", title: "こえ", href: "./koe.html" },
+  { id: "nemuri", title: "ねむり", href: "./nemuri.html" },
 ];
 
 export function mountNav(current: string) {

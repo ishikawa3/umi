@@ -11,6 +11,7 @@ export default defineConfig({
         kuroshio: resolve(__dirname, "kuroshio.html"),
         tide: resolve(__dirname, "tide.html"),
         koe: resolve(__dirname, "koe.html"),
+        nemuri: resolve(__dirname, "nemuri.html"),
       },
     },
   },

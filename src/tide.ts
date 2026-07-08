@@ -5,6 +5,7 @@ import {
 } from "./api";
 import { JapanMap, JAPAN_BBOX } from "./japanmap";
 import { speedColor } from "./render";
+import { moonAge, tideName, drawMoon } from "./moon";
 import { mountNav } from "./nav";
 
 mountNav("shiodoki");
@@ -313,6 +314,10 @@ async function boot() {
   head = now.getUTCHours() * 60 + now.getUTCMinutes();
   timeSlider.value = String(Math.floor(head));
   drawLegend();
+  // 月齢と潮名（潮汐は月が起こす）
+  const age = moonAge(new Date());
+  drawMoon(document.getElementById("moon") as HTMLCanvasElement, age);
+  document.getElementById("moon-label")!.textContent = `月齢 ${age.toFixed(1)} ・ ${tideName(age)}`;
   requestAnimationFrame(tick);
   await loadAll();
 }
