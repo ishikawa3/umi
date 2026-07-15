@@ -12,6 +12,7 @@ export default defineConfig({
         tide: resolve(__dirname, "tide.html"),
         koe: resolve(__dirname, "koe.html"),
         nemuri: resolve(__dirname, "nemuri.html"),
+        nami: resolve(__dirname, "nami.html"),
       },
     },
   },

@@ -21,6 +21,16 @@
       <h1 id="station-title">しおどき</h1>
       <p class="sub" id="station-sub">Breathing Tides</p>
       <p class="meta moon-row"><canvas id="moon" width="30" height="30"></canvas><span id="moon-label"></span></p>
+      <!-- C-1: 日付ナビ -->
+      <div class="date-nav">
+        <button id="date-prev" aria-label="前の日" disabled>◀</button>
+        <span id="date-label"></span>
+        <button id="date-next" aria-label="次の日">▶</button>
+      </div>
+      <!-- C-2: 地点検索 -->
+      <div class="station-search-wrap">
+        <input id="station-search" type="search" placeholder="地点名で検索…" aria-label="検潮所を検索" autocomplete="off" />
+      </div>
       <p class="site-name">うみ — 潮流のかたち</p>
     </header>
 

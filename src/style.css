@@ -291,4 +291,182 @@ html, body { height: 100%; overflow: hidden; background: #04070f; }
   .credit { display: none; }
   .hud-legend { right: 1.2rem; bottom: 5.6rem; }
   .hud-nav { right: 1.2rem; bottom: 9rem; }
+  .drawer-toggle { display: flex; }
+}
+
+/* --- E-1: モバイル海域ドロワー --- */
+.drawer-toggle {
+  display: none;
+  position: fixed;
+  top: 1.2rem;
+  right: 1.2rem;
+  z-index: 10;
+  background: var(--panel);
+  border: 1px solid rgba(127, 227, 224, 0.2);
+  border-radius: 8px;
+  color: var(--ink);
+  font-size: 1.3rem;
+  width: 2.4rem;
+  height: 2.4rem;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+.drawer-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 7, 15, 0.55);
+  z-index: 11;
+}
+.drawer-overlay.visible { display: block; }
+.area-drawer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 12;
+  background: rgba(8, 14, 26, 0.92);
+  border-top: 1px solid rgba(127, 227, 224, 0.18);
+  border-radius: 16px 16px 0 0;
+  padding: 1.2rem 1.4rem 2rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  max-height: 55vh;
+  overflow-y: auto;
+  backdrop-filter: blur(12px);
+  transform: translateY(100%);
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.area-drawer.open { transform: translateY(0); }
+
+/* --- B-2: キーボードヒント --- */
+.kb-hint {
+  left: 50%;
+  bottom: 5.4rem;
+  transform: translateX(-50%);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  color: var(--ink-3);
+  pointer-events: none;
+  transition: opacity 0.6s;
+}
+.kb-hint.hidden { opacity: 0; }
+
+/* --- C-1: 日付ナビ --- */
+.date-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 0.6rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.date-nav button {
+  font-family: inherit;
+  background: none;
+  border: none;
+  color: var(--ink-3);
+  font-size: 0.7rem;
+  cursor: pointer;
+  padding: 0.1rem 0.3rem;
+  transition: color 0.2s;
+}
+.date-nav button:hover:not(:disabled) { color: var(--accent); }
+.date-nav button:disabled { opacity: 0.25; cursor: default; }
+
+/* --- C-2: 地点検索 --- */
+.station-search-wrap {
+  margin-top: 0.55rem;
+}
+#station-search {
+  font-family: inherit;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  background: rgba(8, 14, 26, 0.5);
+  border: 1px solid rgba(127, 227, 224, 0.18);
+  border-radius: 999px;
+  color: var(--ink);
+  padding: 0.2rem 0.7rem;
+  outline: none;
+  width: 100%;
+  max-width: 13rem;
+}
+#station-search::placeholder { color: var(--ink-3); }
+#station-search:focus { border-color: rgba(127, 227, 224, 0.45); }
+
+/* --- D-2: フィルタチップ --- */
+.hud-filter-chips {
+  top: 2.2rem;
+  right: 2.4rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: flex-end;
+  max-width: 16rem;
+}
+.filter-chip {
+  font-family: inherit;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  color: var(--ink-3);
+  background: var(--panel);
+  border: 1px solid rgba(127, 227, 224, 0.12);
+  border-radius: 999px;
+  padding: 0.22rem 0.6rem;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: color 0.2s, border-color 0.2s;
+}
+.filter-chip:hover { color: var(--chip-color, var(--ink)); border-color: rgba(127, 227, 224, 0.3); }
+.filter-chip.active {
+  color: var(--chip-color, var(--accent));
+  border-color: var(--chip-color, var(--accent));
+}
+
+/* --- E-2: ナビ hover ツールチップ --- */
+.hud-nav a[data-desc]::after {
+  content: attr(data-desc);
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: 0.35rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  writing-mode: horizontal-tb;
+  color: var(--ink-2);
+  background: var(--panel);
+  border: 1px solid rgba(127, 227, 224, 0.12);
+  border-radius: 4px;
+  padding: 0.15rem 0.4rem;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s;
+}
+.hud-nav a[data-desc] { position: relative; }
+.hud-nav a[data-desc]:hover::after { opacity: 1; }
+
+/* --- B-3: 共有ボタン --- */
+#share {
+  font-family: inherit;
+  background: none;
+  border: none;
+  color: var(--ink-3);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.2s;
+}
+#share:hover { color: var(--ink); }
+
+/* --- prefers-reduced-motion --- */
+@media (prefers-reduced-motion: reduce) {
+  .chip, .filter-chip, .hud-nav a, #share, .date-nav button { transition: none; }
+  .area-drawer { transition: none; }
+  .kb-hint { transition: none; }
 }

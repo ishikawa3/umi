@@ -19,6 +19,10 @@ const timeLabel = document.getElementById("time-label")!;
 const playBtn = document.getElementById("play") as HTMLButtonElement;
 const legendCanvas = document.getElementById("legend-ramp") as HTMLCanvasElement;
 const tooltip = document.getElementById("tooltip")!;
+const datePrevBtn = document.getElementById("date-prev") as HTMLButtonElement;
+const dateNextBtn = document.getElementById("date-next") as HTMLButtonElement;
+const dateLabelEl = document.getElementById("date-label")!;
+const searchInput = document.getElementById("station-search") as HTMLInputElement;
 
 const map = new JapanMap(canvas, JAPAN_BBOX);
 
@@ -32,7 +36,29 @@ const tideCache = new Map<string, TideDay>();
 let selected: TideStation | null = null;
 let head = 0; // 現在時刻（分, 0..1439, 小数可）
 let playing = true;
-const dateStr = toMsilDate(new Date()); // 今日（JST）固定
+
+// C-1: 日付オフセット（0=今日, -1=昨日, +1=明日）
+let dateOffset = 0;
+let searchQuery = ""; // C-2: 検索文字列
+
+/** 日付オフセットからMSIL日付文字列を返す */
+function currentDateStr(): string {
+  const base = new Date(Date.now() + 9 * 3600_000); // JST now
+  const target = new Date(base.getTime() + dateOffset * 86_400_000);
+  const p = (n: number, w = 2) => String(n).padStart(w, "0");
+  return (
+    p(target.getUTCFullYear(), 4) +
+    p(target.getUTCMonth() + 1) +
+    p(target.getUTCDate())
+  );
+}
+
+function updateDateLabel() {
+  const s = currentDateStr();
+  dateLabelEl.textContent = `${s.slice(0, 4)}.${s.slice(4, 6)}.${s.slice(6)}`;
+  datePrevBtn.disabled = dateOffset <= -3;
+  dateNextBtn.disabled = dateOffset >= 3;
+}
 
 // ---- データ取得 --------------------------------------------------------
 /** 全国313地点を緯度経度グリッドで約60点に間引く */
@@ -52,11 +78,12 @@ function thinStations(all: TideStation[]): TideStation[] {
 }
 
 async function loadTide(s: TideStation): Promise<TideDay | null> {
-  const hit = tideCache.get(s.code);
+  const key = `${s.code}:${currentDateStr()}`;
+  const hit = tideCache.get(key);
   if (hit) return hit;
   try {
-    const d = await fetchTideDay(s.code, dateStr);
-    if (d.tide.length) tideCache.set(s.code, d);
+    const d = await fetchTideDay(s.code, currentDateStr());
+    if (d.tide.length) tideCache.set(key, d);
     return d.tide.length ? d : null;
   } catch {
     return null;
@@ -73,6 +100,10 @@ async function loadAll() {
 }
 
 // ---- 描画 --------------------------------------------------------------
+function tideKey(s: TideStation): string {
+  return `${s.code}:${currentDateStr()}`;
+}
+
 function tideAt(d: TideDay, minute: number): number {
   const idx = Math.min(Math.floor((minute / MINUTES) * d.tide.length), d.tide.length - 1);
   return d.tide[idx];
@@ -93,12 +124,14 @@ function drawStations() {
   const ctx = map.ctx;
   ctx.globalCompositeOperation = "lighter";
   for (const s of shown) {
-    const d = tideCache.get(s.code);
+    const d = tideCache.get(tideKey(s));
     if (!d) continue;
     const t = normTide(d, head);
     const [x, y] = map.toScreen(s.lon, s.lat);
     const [r, g, b] = speedColor(t, 1);
     const rad = (1.6 + 3.6 * t) * map.dpr;
+    // C-2: 検索マッチのハイライト
+    const isMatch = searchQuery.length > 0 && s.nameJa.includes(searchQuery);
     // 外側のにじみ＋芯
     ctx.fillStyle = `rgba(${r | 0}, ${g | 0}, ${b | 0}, ${0.10 + t * 0.12})`;
     ctx.beginPath();
@@ -115,6 +148,15 @@ function drawStations() {
       ctx.arc(x, y, rad + 5 * map.dpr, 0, Math.PI * 2);
       ctx.stroke();
     }
+    if (isMatch) {
+      ctx.globalCompositeOperation = "source-over";
+      ctx.strokeStyle = "rgba(127, 227, 224, 0.9)";
+      ctx.lineWidth = 2 * map.dpr;
+      ctx.beginPath();
+      ctx.arc(x, y, rad + 8 * map.dpr, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalCompositeOperation = "lighter";
+    }
   }
   ctx.globalCompositeOperation = "source-over";
 }
@@ -122,7 +164,7 @@ function drawStations() {
 /** 選択地点の1日の潮位曲線（画面下部に直接描く） */
 function drawCurve() {
   if (!selected) return;
-  const d = tideCache.get(selected.code);
+  const d = tideCache.get(tideKey(selected));
   if (!d) return;
   const ctx = map.ctx;
   const W = canvas.width;
@@ -216,7 +258,8 @@ function tick(ts: number) {
     if (head >= MINUTES) head = 0;
     timeSlider.value = String(Math.floor(head));
   }
-  timeLabel.textContent = `${dateStr.slice(0, 4)}.${dateStr.slice(4, 6)}.${dateStr.slice(6)} ${fmtMinute(head)} JST`;
+  const ds = currentDateStr();
+  timeLabel.textContent = `${ds.slice(0, 4)}.${ds.slice(4, 6)}.${ds.slice(6)} ${fmtMinute(head)} JST`;
   map.drawBase();
   drawStations();
   drawCurve();
@@ -244,7 +287,7 @@ canvas.addEventListener("click", async (ev) => {
   selected = s;
   titleEl.textContent = s.nameJa;
   subEl.textContent = s.nameEn;
-  if (!tideCache.get(s.code)) {
+  if (!tideCache.get(tideKey(s))) {
     statusEl.textContent = "潮位データ取得中…";
     await loadTide(s);
     statusEl.textContent = "";
@@ -252,9 +295,8 @@ canvas.addEventListener("click", async (ev) => {
 });
 
 canvas.addEventListener("pointermove", (ev) => {
-  // 地点の上では地点名、（地点がなければ）曲線の帯では時刻と潮位を出す
   const s = nearestStation(ev.clientX, ev.clientY, 16);
-  const d = selected ? tideCache.get(selected.code) : undefined;
+  const d = selected ? tideCache.get(tideKey(selected)) : undefined;
   const yCss = ev.clientY * map.dpr;
   if (!s && d && yCss > canvas.height * 0.7) {
     const x0 = canvas.width * 0.08;
@@ -270,7 +312,7 @@ canvas.addEventListener("pointermove", (ev) => {
     }
   }
   if (s) {
-    const sd = tideCache.get(s.code);
+    const sd = tideCache.get(tideKey(s));
     tooltip.classList.add("visible");
     tooltip.style.left = `${ev.clientX + 14}px`;
     tooltip.style.top = `${ev.clientY + 14}px`;
@@ -288,6 +330,32 @@ playBtn.addEventListener("click", () => {
   playing = !playing;
   playBtn.textContent = playing ? "❚❚" : "▶";
 });
+
+// C-1: 日付ナビゲーション
+async function changeDate(offset: number) {
+  dateOffset = offset;
+  updateDateLabel();
+  // 月齢と潮名を更新
+  const baseJst = new Date(Date.now() + 9 * 3600_000 + dateOffset * 86_400_000);
+  const age = moonAge(new Date(baseJst.getTime() - 9 * 3600_000));
+  drawMoon(document.getElementById("moon") as HTMLCanvasElement, age);
+  document.getElementById("moon-label")!.textContent = `月齢 ${age.toFixed(1)} ・ ${tideName(age)}`;
+  statusEl.textContent = "潮位データ取得中…";
+  await loadAll();
+}
+
+datePrevBtn.addEventListener("click", () => {
+  if (dateOffset > -3) void changeDate(dateOffset - 1);
+});
+dateNextBtn.addEventListener("click", () => {
+  if (dateOffset < 3) void changeDate(dateOffset + 1);
+});
+
+// C-2: 地点検索
+searchInput.addEventListener("input", () => {
+  searchQuery = searchInput.value.trim();
+});
+
 window.addEventListener("resize", () => map.resize());
 
 function drawLegend() {
@@ -314,6 +382,7 @@ async function boot() {
   head = now.getUTCHours() * 60 + now.getUTCMinutes();
   timeSlider.value = String(Math.floor(head));
   drawLegend();
+  updateDateLabel();
   // 月齢と潮名（潮汐は月が起こす）
   const age = moonAge(new Date());
   drawMoon(document.getElementById("moon") as HTMLCanvasElement, age);

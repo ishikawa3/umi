@@ -3,14 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>こえ | うみ</title>
-    <meta name="description" content="海上保安庁「海しる」航行警報 — いま日本の海で起きていること" />
+    <title>なみ | うみ</title>
+    <meta name="description" content="海上保安庁「海しる」波浪データによる日本近海の波の星図" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%2304070f'/><g fill='none' stroke='%237fe3e0' stroke-width='2.2' stroke-linecap='round'><path d='M6 13c3-3.5 5 3.5 8 0s5 3.5 8 0' opacity='.95'/><path d='M6 21c3-3.5 5 3.5 8 0s5 3.5 8 0' opacity='.45'/></g></svg>" />
     <meta property="og:site_name" content="うみ" />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="こえ | うみ" />
-    <meta property="og:description" content="航行警報 — いま日本の海で起きていることば" />
-    <meta property="og:url" content="https://ishikawa3.github.io/umi/koe.html" />
+    <meta property="og:title" content="なみ | うみ" />
+    <meta property="og:description" content="波浪データで描く日本近海の波の星図" />
+    <meta property="og:url" content="https://ishikawa3.github.io/umi/nami.html" />
     <meta property="og:image" content="https://ishikawa3.github.io/umi/og.jpg" />
     <meta name="twitter:card" content="summary_large_image" />
   </head>
@@ -18,22 +18,20 @@
     <canvas id="sea"></canvas>
 
     <header class="hud hud-title">
-      <h1>こえ</h1>
-      <p class="sub">Voices of the Sea</p>
-      <p class="meta" id="koe-count"></p>
+      <h1>なみ</h1>
+      <p class="sub">Wave Heights of Japan</p>
+      <p class="meta" id="wave-meta"></p>
       <p class="site-name">うみ — 潮流のかたち</p>
     </header>
 
-    <!-- D-2: フィルタチップ -->
-    <div class="hud hud-filter-chips" id="filter-chips" aria-label="警報種別フィルタ"></div>
 
-    <aside class="hud hud-list" id="warning-list" aria-label="航行警報一覧"></aside>
 
-    <div class="hud hud-panel" id="detail-panel" hidden>
-      <button id="panel-close" aria-label="閉じる">×</button>
-      <h2 id="panel-title"></h2>
-      <p id="panel-body"></p>
-    </div>
+    <aside class="hud hud-legend">
+      <span class="legend-label">波高</span>
+      <span class="legend-tick">0</span>
+      <canvas id="legend-ramp" width="120" height="8"></canvas>
+      <span class="legend-tick" id="legend-max"></span>
+    </aside>
 
     <div id="status" class="hud" role="status"></div>
     <div id="tooltip" role="tooltip"></div>
@@ -41,9 +39,9 @@
     <p class="hud credit">
       データ: 海上保安庁
       <a href="https://portal.msil.go.jp/" target="_blank" rel="noopener">海洋状況表示システム「海しる」API</a>
-      （航行警報）／陸域: 国土地理院 淡色地図／航海には使用しないでください
+      （波浪解析）／陸域: 国土地理院 淡色地図／航海には使用しないでください
     </p>
 
-    <script type="module" src="/src/koe.ts"></script>
+    <script type="module" src="/src/nami.ts"></script>
   </body>
 </html>
