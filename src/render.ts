@@ -42,6 +42,7 @@ export class FlowRenderer {
   private mask: LandMask | null = null;
   private lookupOut = new Float32Array(2);
   private lookupTmp = new Float32Array(2);
+  private reducedMotion: boolean;
   // 投影パラメータ
   private scale = 1;
   private ox = 0;
@@ -49,7 +50,8 @@ export class FlowRenderer {
   private latScale = 1;
   dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-  constructor(private canvas: HTMLCanvasElement) {
+  constructor(private canvas: HTMLCanvasElement, reducedMotion = false) {
+    this.reducedMotion = reducedMotion;
     this.ctx = canvas.getContext("2d", { alpha: false })!;
     this.resize();
   }
@@ -195,6 +197,13 @@ export class FlowRenderer {
     const f = this.fieldA;
     if (!f) return;
 
+    if (this.reducedMotion) {
+      // アニメーションなし: 静止速度マップのみ描く
+      this.clearAll();
+      this.drawStaticSpeedMap();
+      return;
+    }
+
     // 残像フェード（軌跡）
     ctx.globalCompositeOperation = "source-over";
     ctx.fillStyle = "rgba(4, 7, 15, 0.06)";
@@ -246,6 +255,31 @@ export class FlowRenderer {
       ctx.stroke();
       p.px = sx;
       p.py = sy;
+    }
+    ctx.globalCompositeOperation = "source-over";
+  }
+
+  /** prefers-reduced-motion 用: 粒子なしで速度をドット密度で表示 */
+  private drawStaticSpeedMap() {
+    if (!this.fieldA || !this.area) return;
+    const ctx = this.ctx;
+    const f = this.fieldA;
+    const refKt = this.refKt;
+    const out = this.lookupOut;
+    const step = 6; // グリッド間隔(px)
+    ctx.globalCompositeOperation = "lighter";
+    for (let px = 0; px < this.canvas.width; px += step) {
+      for (let py = 0; py < this.canvas.height; py += step) {
+        const [lon, lat] = this.toLonLat(px, py);
+        if (this.mask && !this.mask.isWater(lon, lat)) continue;
+        const ok = f.lookup(lon, lat, out);
+        if (!ok) continue;
+        const kt = Math.hypot(out[0], out[1]);
+        const [r, g, b] = speedColor(kt, refKt);
+        const t = Math.pow(Math.min(kt / refKt, 1), 0.7);
+        ctx.fillStyle = `rgba(${r | 0}, ${g | 0}, ${b | 0}, ${0.08 + t * 0.25})`;
+        ctx.fillRect(px, py, step - 1, step - 1);
+      }
     }
     ctx.globalCompositeOperation = "source-over";
   }

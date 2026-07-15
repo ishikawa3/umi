@@ -27,10 +27,17 @@
       <div id="area-chips"></div>
     </nav>
 
+    <!-- E-1: モバイル用ドロワートグル -->
+    <button id="drawer-toggle" class="hud drawer-toggle" aria-label="海域を選ぶ" aria-expanded="false" aria-controls="area-drawer">≡</button>
+    <div id="drawer-overlay" class="drawer-overlay"></div>
+    <div id="area-drawer" class="area-drawer" aria-label="海域選択ドロワー"></div>
+
     <footer class="hud hud-bottom">
       <button id="play" aria-label="一時停止">❚❚</button>
       <input id="time-slider" type="range" step="0.01" aria-label="時刻" />
       <span id="time-label"></span>
+      <!-- B-3: 共有ボタン -->
+      <button id="share" aria-label="スクリーンショットを共有">📷</button>
     </footer>
 
     <aside class="hud hud-legend">
@@ -39,6 +46,9 @@
       <canvas id="legend-ramp" width="120" height="8"></canvas>
       <span class="legend-tick" id="legend-max"></span>
     </aside>
+
+    <!-- B-2: キーボードヒント -->
+    <div id="kb-hint" class="hud kb-hint" aria-hidden="true">Space 再生/停止 &nbsp; ← → 時刻移動</div>
 
     <div id="status" class="hud" role="status"></div>
     <div id="tooltip" role="tooltip"></div>

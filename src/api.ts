@@ -162,3 +162,36 @@ export async function fetchContours(bbox: [number, number, number, number]): Pro
   }
   return lines;
 }
+
+export interface WaveSample {
+  lon: number;
+  lat: number;
+  /** 有義波高 [m] */
+  height: number;
+  /** 波向き（北=0°時計回り、波が来る方向） */
+  dir: number;
+}
+
+/**
+ * 波浪解析データを取得する。
+ * 海しる wave-analysis/v2 MapServer（layer 0: 波高、layer 1: 波向き）。
+ * bbox は日本全域 JAPAN_BBOX を想定。
+ */
+export async function fetchWaves(bbox: [number, number, number, number]): Promise<WaveSample[]> {
+  const gj = await arcgisQuery("wave-analysis/v2", 0, bbox, {
+    outFields: "SigWaveHeight,PeakWaveDirection",
+  });
+  const out: WaveSample[] = [];
+  for (const f of gj.features ?? []) {
+    // APIのレスポンスフィールド名が大小文字どちらのケースでも来ることがあるため両方試みる
+    const h = f.properties.SigWaveHeight ?? f.properties.sigwaveheight ?? null;
+    if (h === null) continue;
+    out.push({
+      lon: f.geometry.coordinates[0],
+      lat: f.geometry.coordinates[1],
+      height: Number(h),
+      dir: Number(f.properties.PeakWaveDirection ?? f.properties.peakwavedirection ?? 0),
+    });
+  }
+  return out;
+}

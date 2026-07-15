@@ -3,14 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>しおどき | うみ</title>
-    <meta name="description" content="海上保安庁「海しる」潮汐推算による、日本列島の潮の呼吸" />
+    <title>なみ | うみ</title>
+    <meta name="description" content="海上保安庁「海しる」波浪データによる日本近海の波の星図" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%2304070f'/><g fill='none' stroke='%237fe3e0' stroke-width='2.2' stroke-linecap='round'><path d='M6 13c3-3.5 5 3.5 8 0s5 3.5 8 0' opacity='.95'/><path d='M6 21c3-3.5 5 3.5 8 0s5 3.5 8 0' opacity='.45'/></g></svg>" />
     <meta property="og:site_name" content="うみ" />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="しおどき | うみ" />
-    <meta property="og:description" content="全国の検潮所が潮の満ち引きで呼吸する、日本列島の一日" />
-    <meta property="og:url" content="https://ishikawa3.github.io/umi/tide.html" />
+    <meta property="og:title" content="なみ | うみ" />
+    <meta property="og:description" content="波浪データで描く日本近海の波の星図" />
+    <meta property="og:url" content="https://ishikawa3.github.io/umi/nami.html" />
     <meta property="og:image" content="https://ishikawa3.github.io/umi/og.jpg" />
     <meta name="twitter:card" content="summary_large_image" />
   </head>
@@ -18,19 +18,9 @@
     <canvas id="sea"></canvas>
 
     <header class="hud hud-title">
-      <h1 id="station-title">しおどき</h1>
-      <p class="sub" id="station-sub">Breathing Tides</p>
-      <p class="meta moon-row"><canvas id="moon" width="30" height="30"></canvas><span id="moon-label"></span></p>
-      <!-- C-1: 日付ナビ -->
-      <div class="date-nav">
-        <button id="date-prev" aria-label="前の日" disabled>◀</button>
-        <span id="date-label"></span>
-        <button id="date-next" aria-label="次の日">▶</button>
-      </div>
-      <!-- C-2: 地点検索 -->
-      <div class="station-search-wrap">
-        <input id="station-search" type="search" placeholder="地点名で検索…" aria-label="検潮所を検索" autocomplete="off" />
-      </div>
+      <h1>なみ</h1>
+      <p class="sub">Wave Heights of Japan</p>
+      <p class="meta" id="wave-meta"></p>
       <p class="site-name">うみ — 潮流のかたち</p>
     </header>
 
@@ -41,9 +31,10 @@
     </footer>
 
     <aside class="hud hud-legend">
-      <span class="legend-tick">干潮</span>
+      <span class="legend-label">波高</span>
+      <span class="legend-tick">0</span>
       <canvas id="legend-ramp" width="120" height="8"></canvas>
-      <span class="legend-tick">満潮</span>
+      <span class="legend-tick" id="legend-max"></span>
     </aside>
 
     <div id="status" class="hud" role="status"></div>
@@ -52,9 +43,9 @@
     <p class="hud credit">
       データ: 海上保安庁
       <a href="https://portal.msil.go.jp/" target="_blank" rel="noopener">海洋状況表示システム「海しる」API</a>
-      （潮汐推算）／陸域: 国土地理院 淡色地図／航海には使用しないでください
+      （波浪解析）／陸域: 国土地理院 淡色地図／航海には使用しないでください
     </p>
 
-    <script type="module" src="/src/tide.ts"></script>
+    <script type="module" src="/src/nami.ts"></script>
   </body>
 </html>

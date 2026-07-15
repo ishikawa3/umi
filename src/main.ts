@@ -18,12 +18,20 @@ const areaSub = document.getElementById("area-sub")!;
 const timeSlider = document.getElementById("time-slider") as HTMLInputElement;
 const timeLabel = document.getElementById("time-label")!;
 const playBtn = document.getElementById("play") as HTMLButtonElement;
+const shareBtn = document.getElementById("share") as HTMLButtonElement;
 const statusEl = document.getElementById("status")!;
 const legendCanvas = document.getElementById("legend-ramp") as HTMLCanvasElement;
 const legendMax = document.getElementById("legend-max")!;
 const tooltip = document.getElementById("tooltip")!;
+const drawerToggle = document.getElementById("drawer-toggle") as HTMLButtonElement;
+const drawerOverlay = document.getElementById("drawer-overlay")!;
+const drawerEl = document.getElementById("area-drawer")!;
+const kbHint = document.getElementById("kb-hint")!;
 
-const renderer = new FlowRenderer(canvas);
+// prefers-reduced-motion
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const renderer = new FlowRenderer(canvas, reducedMotion);
 
 // ---- 時間軸 ----------------------------------------------------------
 const STEP_MS = TIME_STEP_MIN * 60_000;
@@ -134,6 +142,12 @@ async function selectArea(area: Area) {
   for (const el of areaChips.children) {
     el.classList.toggle("active", (el as HTMLElement).dataset.code === area.code);
   }
+  // ドロワー内チップも同期
+  for (const el of drawerEl.querySelectorAll(".chip")) {
+    (el as HTMLElement).classList.toggle("active", (el as HTMLElement).dataset.code === area.code);
+  }
+  // B-1: URLハッシュを更新して共有・リロード後も同じ海域を開く
+  history.replaceState(null, "", `#${area.code}`);
   statusEl.textContent = "潮流データ取得中…";
   const myEpoch = epoch;
   const [contours, mask] = await Promise.all([
@@ -151,10 +165,79 @@ timeSlider.addEventListener("input", () => {
   void applyHead();
 });
 
-playBtn.addEventListener("click", () => {
+function togglePlay() {
   playing = !playing;
   playBtn.textContent = playing ? "❚❚" : "▶";
   playBtn.setAttribute("aria-label", playing ? "一時停止" : "再生");
+}
+
+playBtn.addEventListener("click", togglePlay);
+
+// B-3: スクリーンショット/共有
+shareBtn.addEventListener("click", async () => {
+  // 現在時刻と海域名をcanvasに重ねて書き出す
+  const tmp = document.createElement("canvas");
+  tmp.width = canvas.width;
+  tmp.height = canvas.height;
+  const tc = tmp.getContext("2d")!;
+  tc.drawImage(canvas, 0, 0);
+  const label = currentArea ? `${currentArea.nameJa}  ${timeLabel.textContent ?? ""}` : (timeLabel.textContent ?? "");
+  tc.font = `${14 * renderer.dpr}px "Hiragino Mincho ProN", serif`;
+  tc.fillStyle = "rgba(226,238,248,0.75)";
+  tc.fillText(label, 20 * renderer.dpr, tmp.height - 20 * renderer.dpr);
+  tmp.toBlob(async (blob) => {
+    if (!blob) return;
+    const file = new File([blob], "umi.png", { type: "image/png" });
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], title: "うみ — 潮流のかたち" }).catch(() => {/* cancel */});
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "umi.png";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  }, "image/png");
+});
+
+// E-1: ドロワー開閉
+function openDrawer() {
+  drawerEl.classList.add("open");
+  drawerOverlay.classList.add("visible");
+  drawerToggle.setAttribute("aria-expanded", "true");
+}
+function closeDrawer() {
+  drawerEl.classList.remove("open");
+  drawerOverlay.classList.remove("visible");
+  drawerToggle.setAttribute("aria-expanded", "false");
+}
+drawerToggle.addEventListener("click", () => {
+  drawerEl.classList.contains("open") ? closeDrawer() : openDrawer();
+});
+drawerOverlay.addEventListener("click", closeDrawer);
+
+// B-2: キーボードショートカット
+// 初回5秒でヒントを非表示
+setTimeout(() => kbHint.classList.add("hidden"), 5000);
+window.addEventListener("keydown", (ev) => {
+  // テキスト入力中は無視
+  const tag = (ev.target as Element)?.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA") return;
+  if (ev.key === " ") {
+    ev.preventDefault();
+    togglePlay();
+  } else if (ev.key === "ArrowRight") {
+    ev.preventDefault();
+    head = Math.min(Number(timeSlider.value) + 1, steps);
+    timeSlider.value = String(head);
+    void applyHead();
+  } else if (ev.key === "ArrowLeft") {
+    ev.preventDefault();
+    head = Math.max(Number(timeSlider.value) - 1, 0);
+    timeSlider.value = String(head);
+    void applyHead();
+  }
 });
 
 canvas.addEventListener("pointermove", (ev) => {
@@ -193,7 +276,6 @@ function tick(ts: number) {
   renderer.frame(dt);
   requestAnimationFrame(tick);
 }
-
 // ---- 起動 ------------------------------------------------------------
 async function boot() {
   statusEl.textContent = "海域一覧を取得中…";
@@ -204,17 +286,32 @@ async function boot() {
     return;
   }
   for (const a of areas) {
+    // デスクトップ用チップ
     const chip = document.createElement("button");
     chip.className = "chip";
     chip.dataset.code = a.code;
     chip.textContent = a.nameJa;
     chip.addEventListener("click", () => void selectArea(a));
     areaChips.appendChild(chip);
+    // E-1: ドロワー用チップ
+    const dc = document.createElement("button");
+    dc.className = "chip";
+    dc.dataset.code = a.code;
+    dc.textContent = a.nameJa;
+    dc.addEventListener("click", () => { void selectArea(a); closeDrawer(); });
+    drawerEl.appendChild(dc);
   }
-  // 来島海峡（最も高密度・高流速）を初期表示に
-  const initial = areas.find((a) => a.code === "S01") ?? areas[0];
+  // B-1: URLハッシュから初期海域を選ぶ（なければ来島海峡 S01）
+  const hashCode = location.hash.slice(1);
+  const initial = areas.find((a) => a.code === hashCode)
+    ?? areas.find((a) => a.code === "S01")
+    ?? areas[0];
   await selectArea(initial);
-  requestAnimationFrame(tick);
+  if (!reducedMotion) requestAnimationFrame(tick);
+  else {
+    // reduced motion: アニメなしで1枚だけ描画
+    renderer.frame(0);
+  }
 }
 
 void boot();
