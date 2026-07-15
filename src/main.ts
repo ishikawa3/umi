@@ -99,12 +99,16 @@ async function applyHead() {
     renderer.setFields(fa, fieldCache.get(fieldKey(currentArea, s1)) ?? null, head - s0);
     statusEl.textContent = "";
     updateLegend();
+    if (reducedMotion) renderer.frame(0);
     // 次のフレームを先読み
     void loadField(currentArea, s1).then(() => {
       if (myEpoch !== epoch || !currentArea) return;
       const f0 = fieldCache.get(fieldKey(currentArea, Math.floor(head)));
       const f1 = fieldCache.get(fieldKey(currentArea, Math.min(Math.floor(head) + 1, steps)));
-      if (f0) renderer.setFields(f0, f1 ?? null, head - Math.floor(head));
+      if (f0) {
+        renderer.setFields(f0, f1 ?? null, head - Math.floor(head));
+        if (reducedMotion) renderer.frame(0);
+      }
     });
   } catch (e) {
     if (myEpoch === epoch) statusEl.textContent = "データ取得に失敗しました（再試行します）";
@@ -253,7 +257,10 @@ canvas.addEventListener("pointermove", (ev) => {
 });
 canvas.addEventListener("pointerleave", () => tooltip.classList.remove("visible"));
 
-window.addEventListener("resize", () => renderer.resize());
+window.addEventListener("resize", () => {
+  renderer.resize();
+  if (reducedMotion) renderer.frame(0);
+});
 
 // ---- メインループ ----------------------------------------------------
 let lastTs = performance.now();

@@ -9,9 +9,6 @@ mountNav("nami");
 const canvas = document.getElementById("sea") as HTMLCanvasElement;
 const statusEl = document.getElementById("status")!;
 const waveMetaEl = document.getElementById("wave-meta")!;
-const timeSlider = document.getElementById("time-slider") as HTMLInputElement;
-const timeLabel = document.getElementById("time-label")!;
-const playBtn = document.getElementById("play") as HTMLButtonElement;
 const legendCanvas = document.getElementById("legend-ramp") as HTMLCanvasElement;
 const legendMax = document.getElementById("legend-max")!;
 const tooltip = document.getElementById("tooltip")!;
@@ -21,14 +18,7 @@ const map = new JapanMap(canvas, JAPAN_BBOX);
 // 波高の目安最大値 [m]（色スケール上限）
 const MAX_HEIGHT_M = 6;
 
-// 6時間ごと24時間分のタイムステップ
-const STEPS = 5; // 0h, 6h, 12h, 18h, 24h
-timeSlider.min = "0";
-timeSlider.max = String(STEPS - 1);
-
-let frames: WaveSample[][] = [];
-let head = 0;
-let playing = true;
+let samples: WaveSample[] = [];
 
 // 現在時刻（JST）を6時間刻みに丸める
 function getBaseTime(): Date {
@@ -46,7 +36,7 @@ function fmtJst(d: Date): string {
 }
 
 // ---- 描画 ----------------------------------------------------------------
-function drawWaves(samples: WaveSample[]) {
+function drawWaves() {
   map.drawBase();
   const ctx = map.ctx;
   ctx.globalCompositeOperation = "lighter";
@@ -94,40 +84,9 @@ function drawLegend() {
   legendMax.textContent = `${MAX_HEIGHT_M} m`;
 }
 
-// ---- メインループ -------------------------------------------------------
-let lastTs = performance.now();
-function tick(ts: number) {
-  const dt = Math.min((ts - lastTs) / 1000, 0.1);
-  lastTs = ts;
-  if (playing && frames.length > 0) {
-    head += dt * 0.15; // 1秒 ≈ 0.15ステップ (6h / ~40s)
-    if (head >= STEPS) head = 0;
-    timeSlider.value = String(Math.floor(head));
-  }
-  const idx = Math.min(Math.floor(head), frames.length - 1);
-  if (frames[idx]) {
-    drawWaves(frames[idx]);
-    const baseTime = getBaseTime();
-    const t = new Date(baseTime.getTime() + idx * 6 * 3600_000);
-    timeLabel.textContent = fmtJst(t);
-  }
-  requestAnimationFrame(tick);
-}
-
 // ---- UI -----------------------------------------------------------------
-timeSlider.addEventListener("input", () => {
-  head = Number(timeSlider.value);
-});
-playBtn.addEventListener("click", () => {
-  playing = !playing;
-  playBtn.textContent = playing ? "❚❚" : "▶";
-  playBtn.setAttribute("aria-label", playing ? "一時停止" : "再生");
-});
-
 canvas.addEventListener("pointermove", (ev) => {
-  const idx = Math.min(Math.floor(head), frames.length - 1);
-  const samples = frames[idx];
-  if (!samples) { tooltip.classList.remove("visible"); return; }
+  if (!samples.length) { tooltip.classList.remove("visible"); return; }
   const cx = ev.clientX * map.dpr;
   const cy = ev.clientY * map.dpr;
   let best = Infinity;
@@ -147,31 +106,29 @@ canvas.addEventListener("pointermove", (ev) => {
   }
 });
 canvas.addEventListener("pointerleave", () => tooltip.classList.remove("visible"));
-window.addEventListener("resize", () => map.resize());
+window.addEventListener("resize", () => { map.resize(); drawWaves(); });
 
 // ---- 起動 ---------------------------------------------------------------
 async function boot() {
   statusEl.textContent = "波浪データ取得中…";
   try {
     await map.init();
-    // 現在時刻 + 6h/12h/18h/24h の計5フレームを並列取得
     const base = getBaseTime();
     const result = await fetchWaves(JAPAN_BBOX);
-    frames = Array.from({ length: STEPS }, () => result);
     if (!result.length) {
       statusEl.textContent = "波浪データがありません";
       return;
     }
+    samples = result;
     statusEl.textContent = "";
     const maxH = Math.max(...result.map((s) => s.height));
     waveMetaEl.textContent = `最大有義波高 ${maxH.toFixed(1)} m（解析時刻: ${fmtJst(base)}）`;
     drawLegend();
-    timeSlider.value = "0";
-    head = 0;
-    requestAnimationFrame(tick);
+    drawWaves();
   } catch {
     statusEl.textContent = "海しるAPIに接続できませんでした";
   }
 }
 
 void boot();
+

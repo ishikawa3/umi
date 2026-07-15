@@ -38,7 +38,7 @@ function detectCategory(name: string, body: string): WarningCategory {
   if (/演習|訓練/.test(text)) return CATEGORIES[0];
   if (/工事|作業|設置|撤去/.test(text)) return CATEGORIES[1];
   if (/沈没|沈船|座礁/.test(text)) return CATEGORIES[2];
-  if (/灯台|灯浮標|消灯|点灯|変更/.test(text)) return CATEGORIES[3];
+  if (/灯台|灯浮標|消灯|点灯/.test(text)) return CATEGORIES[3];
   return CATEGORIES[4];
 }
 
@@ -204,7 +204,7 @@ function buildFilterChips() {
 function refreshFilter() {
   buildFilterChips();
   buildList();
-  countEl.textContent = `有効な警報 ${warnings.length}件`;
+  countEl.textContent = `有効な警報 ${visibleWarnings().length}件`;
 }
 
 function nearestWarning(cssX: number, cssY: number, maxCss: number): Warning | null {
