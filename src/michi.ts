@@ -82,8 +82,10 @@ function pixelToLonLat(col: number, row: number): [number, number] {
   return [lon, lat];
 }
 
-// クラス格子（0=背景, 1..4）。ホバーの O(1) 参照にも使う。
+// クラス格子（0=背景, 1..4）。ホバーの O(1) 参照に使う。
 let grid: Uint8Array | null = null;
+// 非0（描画対象）画素のインデックス一覧。描画を O(非0画素数) にするため。
+let activeIdx: Int32Array | null = null;
 
 async function loadTraffic(): Promise<void> {
   const url =
@@ -102,40 +104,47 @@ async function loadTraffic(): Promise<void> {
   const octx = off.getContext("2d", { willReadFrequently: true })!;
   octx.drawImage(bmp, 0, 0, RASTER_W, RASTER_H);
   const data = octx.getImageData(0, 0, RASTER_W, RASTER_H).data;
+  bmp.close(); // ピクセル取得後は不要。大きめの export 画像を早期に解放する。
 
   const g = new Uint8Array(RASTER_W * RASTER_H);
+  const active: number[] = [];
   for (let i = 0, p = 0; i < g.length; i++, p += 4) {
-    g[i] = classify(data[p], data[p + 1], data[p + 2]);
+    const cls = classify(data[p], data[p + 1], data[p + 2]);
+    if (cls !== 0) {
+      g[i] = cls;
+      active.push(i);
+    }
   }
   grid = g;
+  activeIdx = Int32Array.from(active);
 }
 
 // ---- 描画 ----------------------------------------------------------------
 function drawTraffic() {
-  if (!grid) return;
+  if (!grid || !activeIdx) return;
   map.drawBase();
   const ctx = map.ctx;
   ctx.globalCompositeOperation = "lighter";
-  for (let row = 0; row < RASTER_H; row++) {
-    for (let col = 0; col < RASTER_W; col++) {
-      const cls = grid[row * RASTER_W + col];
-      if (cls === 0) continue;
-      const [lon, lat] = pixelToLonLat(col, row);
-      const [x, y] = map.toScreen(lon, lat);
-      const st = CLASS_STYLE[cls - 1];
-      // 過密ほど大きく灯る外側のにじみ
-      if (st.bloom) {
-        ctx.fillStyle = st.fillBloom;
-        ctx.beginPath();
-        ctx.arc(x, y, st.coreR * 2.4, 0, TWO_PI);
-        ctx.fill();
-      }
-      // 芯
-      ctx.fillStyle = st.fillCore;
+  // 非0画素だけを走査（O(非0画素数)）
+  for (let k = 0; k < activeIdx.length; k++) {
+    const idx = activeIdx[k];
+    const col = idx % RASTER_W;
+    const row = (idx / RASTER_W) | 0;
+    const [lon, lat] = pixelToLonLat(col, row);
+    const [x, y] = map.toScreen(lon, lat);
+    const st = CLASS_STYLE[grid[idx] - 1];
+    // 過密ほど大きく灯る外側のにじみ
+    if (st.bloom) {
+      ctx.fillStyle = st.fillBloom;
       ctx.beginPath();
-      ctx.arc(x, y, st.coreR, 0, TWO_PI);
+      ctx.arc(x, y, st.coreR * 2.4, 0, TWO_PI);
       ctx.fill();
     }
+    // 芯
+    ctx.fillStyle = st.fillCore;
+    ctx.beginPath();
+    ctx.arc(x, y, st.coreR, 0, TWO_PI);
+    ctx.fill();
   }
   ctx.globalCompositeOperation = "source-over";
 }
