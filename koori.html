@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>こおり | うみ</title>
+    <meta name="description" content="海上保安庁「海しる」海氷情報によるオホーツク海・北海道沖の海氷分布" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%2304070f'/><g fill='none' stroke='%237fe3e0' stroke-width='2.2' stroke-linecap='round'><path d='M6 13c3-3.5 5 3.5 8 0s5 3.5 8 0' opacity='.95'/><path d='M6 21c3-3.5 5 3.5 8 0s5 3.5 8 0' opacity='.45'/></g></svg>" />
+    <meta property="og:site_name" content="うみ" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="こおり | うみ" />
+    <meta property="og:description" content="海氷情報で描くオホーツク海・北海道沖の凍る海" />
+    <meta property="og:url" content="https://ishikawa3.github.io/umi/koori.html" />
+    <meta property="og:image" content="https://ishikawa3.github.io/umi/og.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body>
+    <canvas id="sea"></canvas>
+
+    <header class="hud hud-title">
+      <h1>こおり</h1>
+      <p class="sub">Sea Ice</p>
+      <p class="meta" id="koori-meta"></p>
+      <p class="site-name">うみ — 潮流のかたち</p>
+    </header>
+
+    <aside class="hud hud-legend" id="koori-legend" hidden>
+      <span class="legend-label">密接度</span>
+      <span class="legend-tick">少</span>
+      <canvas id="legend-ramp" width="120" height="8"></canvas>
+      <span class="legend-tick" id="legend-max">密</span>
+    </aside>
+
+    <div id="status" class="hud" role="status"></div>
+    <div id="tooltip" role="tooltip"></div>
+
+    <p class="hud credit">
+      データ: 海上保安庁
+      <a href="https://portal.msil.go.jp/" target="_blank" rel="noopener">海洋状況表示システム「海しる」API</a>
+      （海氷）／陸域: 国土地理院 淡色地図／航海には使用しないでください
+    </p>
+
+    <script type="module" src="/src/koori.ts"></script>
+  </body>
+</html>

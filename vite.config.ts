@@ -14,6 +14,7 @@ export default defineConfig({
         nemuri: resolve(__dirname, "nemuri.html"),
         nami: resolve(__dirname, "nami.html"),
         michi: resolve(__dirname, "michi.html"),
+        koori: resolve(__dirname, "koori.html"),
       },
     },
   },
