@@ -33,6 +33,28 @@ const CLASS_COLORS: { rgb: [number, number, number]; cls: number }[] = [
 ];
 const CLASS_LABEL = ["閑散", "中", "多い", "過密"];
 
+const TWO_PI = Math.PI * 2;
+
+// クラス(1..4)ごとの描画スタイルを事前計算。speedColor と rgba 文字列生成は
+// ここで4回だけ行い、drawTraffic のループでは per-pixel の再計算・確保を避ける。
+interface ClassStyle {
+  fillCore: string;
+  fillBloom: string;
+  coreR: number; // 既に dpr を掛けた画面px
+  bloom: boolean;
+}
+const CLASS_STYLE: ClassStyle[] = [1, 2, 3, 4].map((cls): ClassStyle => {
+  const t = cls / 4; // 0.25 / 0.5 / 0.75 / 1.0
+  const [r, g, b] = speedColor(t, 1);
+  const rgb = `${r | 0}, ${g | 0}, ${b | 0}`;
+  return {
+    fillCore: `rgba(${rgb}, ${0.22 + t * 0.55})`,
+    fillBloom: `rgba(${rgb}, ${0.05 + t * 0.11})`,
+    coreR: (0.7 + t * 1.5) * map.dpr,
+    bloom: cls >= 2, // 過密ほど大きく灯る外側のにじみ
+  };
+});
+
 /** ピクセルRGB → クラス(1..4)。背景(白)や不明色は 0。 */
 function classify(r: number, g: number, b: number): number {
   // 白背景（253,253,253 近傍）は無データ
@@ -100,20 +122,18 @@ function drawTraffic() {
       if (cls === 0) continue;
       const [lon, lat] = pixelToLonLat(col, row);
       const [x, y] = map.toScreen(lon, lat);
-      const t = cls / 4; // 0.25 / 0.5 / 0.75 / 1.0
-      const [r, gg, b] = speedColor(t, 1);
-      const coreR = (0.7 + t * 1.5) * map.dpr;
+      const st = CLASS_STYLE[cls - 1];
       // 過密ほど大きく灯る外側のにじみ
-      if (cls >= 2) {
-        ctx.fillStyle = `rgba(${r | 0}, ${gg | 0}, ${b | 0}, ${0.05 + t * 0.11})`;
+      if (st.bloom) {
+        ctx.fillStyle = st.fillBloom;
         ctx.beginPath();
-        ctx.arc(x, y, coreR * 2.4, 0, Math.PI * 2);
+        ctx.arc(x, y, st.coreR * 2.4, 0, TWO_PI);
         ctx.fill();
       }
       // 芯
-      ctx.fillStyle = `rgba(${r | 0}, ${gg | 0}, ${b | 0}, ${0.22 + t * 0.55})`;
+      ctx.fillStyle = st.fillCore;
       ctx.beginPath();
-      ctx.arc(x, y, coreR, 0, Math.PI * 2);
+      ctx.arc(x, y, st.coreR, 0, TWO_PI);
       ctx.fill();
     }
   }
@@ -155,9 +175,19 @@ canvas.addEventListener("pointermove", (ev) => {
   tooltip.textContent = `通航 ${CLASS_LABEL[cls - 1]}`;
 });
 canvas.addEventListener("pointerleave", () => tooltip.classList.remove("visible"));
+
+// resize は連続発火するため、描画は requestAnimationFrame で1フレームに集約する
+let drawRaf = 0;
+function scheduleDraw() {
+  if (drawRaf) return;
+  drawRaf = requestAnimationFrame(() => {
+    drawRaf = 0;
+    drawTraffic();
+  });
+}
 window.addEventListener("resize", () => {
   map.resize();
-  drawTraffic();
+  scheduleDraw();
 });
 
 // ---- 起動 ---------------------------------------------------------------
