@@ -40,7 +40,8 @@ export async function msilFetchRaw(
       await new Promise((r) => setTimeout(r, 1200 * (attempt + 1)));
       continue;
     }
-    if (!res.ok) throw new Error(`MSIL API ${res.status}: ${path}`);
+    // 認証キーはヘッダ送信でURLに含まれないため、クエリ込みのURLを出して追跡性を上げる
+    if (!res.ok) throw new Error(`MSIL API ${res.status}: ${url}`);
     return res;
   }
 }

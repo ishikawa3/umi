@@ -121,6 +121,11 @@ async function loadTraffic(): Promise<void> {
     `/monthly-vessel-traffic-amount/v2/${YEAR}/MapServer/export`,
     {
       bbox: `${BB_X0},${BB_Y0},${BB_X1},${BB_Y1}`,
+      // bbox を経緯度で解釈させ、分類前提のロスレスなパレットPNGを固定する
+      // （サーバのデフォルトSR/形式に依存しない。arcgisQuery の inSR:"4326" と同思想）
+      bboxSR: "4326",
+      imageSR: "4326",
+      format: "png8",
       layers: "show:0",
       size: `${RASTER_W},${RASTER_H}`,
       f: "image",
