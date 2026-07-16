@@ -13,6 +13,7 @@ export default defineConfig({
         koe: resolve(__dirname, "koe.html"),
         nemuri: resolve(__dirname, "nemuri.html"),
         nami: resolve(__dirname, "nami.html"),
+        michi: resolve(__dirname, "michi.html"),
       },
     },
   },
