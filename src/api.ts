@@ -22,7 +22,14 @@ export interface ContourLine {
   paths: [number, number][][];
 }
 
-async function msilFetch(path: string, params?: Record<string, string>): Promise<any> {
+/**
+ * 海しるAPIへの生アクセス。429を指数バックオフでリトライし、非OKは例外化する。
+ * バイナリ（画像export等）を扱うページはこの Response を直接使う。
+ */
+export async function msilFetchRaw(
+  path: string,
+  params?: Record<string, string>
+): Promise<Response> {
   const url = new URL(API_BASE + path);
   for (const [k, v] of Object.entries(params ?? {})) url.searchParams.set(k, v);
   for (let attempt = 0; ; attempt++) {
@@ -34,8 +41,12 @@ async function msilFetch(path: string, params?: Record<string, string>): Promise
       continue;
     }
     if (!res.ok) throw new Error(`MSIL API ${res.status}: ${path}`);
-    return res.json();
+    return res;
   }
+}
+
+async function msilFetch(path: string, params?: Record<string, string>): Promise<any> {
+  return (await msilFetchRaw(path, params)).json();
 }
 
 export async function fetchAreas(): Promise<Area[]> {

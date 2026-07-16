@@ -2,7 +2,7 @@ import "./style.css";
 import { JapanMap, JAPAN_BBOX } from "./japanmap";
 import { speedColor } from "./render";
 import { mountNav } from "./nav";
-import { API_BASE, MSIL_KEY } from "./config";
+import { msilFetchRaw } from "./api";
 
 mountNav("michi");
 
@@ -55,6 +55,34 @@ const CLASS_STYLE: ClassStyle[] = [1, 2, 3, 4].map((cls): ClassStyle => {
   };
 });
 
+// クラス別スプライトを1回だけ事前描画。drawTraffic は arc の代わりにこれをブリットする
+// （lighter のまま重ねるので加算＝見た目は不変。パスのラスタライズを bitmap 転送に置換）。
+interface ClassSprite {
+  canvas: HTMLCanvasElement;
+  c: number; // 中心オフセット（= サイズ/2）
+}
+const CLASS_SPRITE: ClassSprite[] = CLASS_STYLE.map((st): ClassSprite => {
+  const maxR = st.bloom ? st.coreR * 2.4 : st.coreR;
+  const size = Math.ceil(maxR * 2) + 2;
+  const c = size / 2;
+  const cv = document.createElement("canvas");
+  cv.width = size;
+  cv.height = size;
+  const sctx = cv.getContext("2d")!;
+  sctx.globalCompositeOperation = "lighter";
+  if (st.bloom) {
+    sctx.fillStyle = st.fillBloom;
+    sctx.beginPath();
+    sctx.arc(c, c, st.coreR * 2.4, 0, TWO_PI);
+    sctx.fill();
+  }
+  sctx.fillStyle = st.fillCore;
+  sctx.beginPath();
+  sctx.arc(c, c, st.coreR, 0, TWO_PI);
+  sctx.fill();
+  return { canvas: cv, c };
+});
+
 /** ピクセルRGB → クラス(1..4)。背景(白)や不明色は 0。 */
 function classify(r: number, g: number, b: number): number {
   // 白背景（253,253,253 近傍）は無データ
@@ -88,12 +116,16 @@ let grid: Uint8Array | null = null;
 let activeIdx: Int32Array | null = null;
 
 async function loadTraffic(): Promise<void> {
-  const url =
-    `${API_BASE}/monthly-vessel-traffic-amount/v2/${YEAR}/MapServer/export` +
-    `?bbox=${BB_X0},${BB_Y0},${BB_X1},${BB_Y1}` +
-    `&layers=show:0&size=${RASTER_W},${RASTER_H}&f=image`;
-  const res = await fetch(url, { headers: { "Ocp-Apim-Subscription-Key": MSIL_KEY } });
-  if (!res.ok) throw new Error(`traffic ${res.status}`);
+  // 429リトライ・認証ヘッダ・非OK例外化を api.ts に集約（msilFetchRaw 経由）
+  const res = await msilFetchRaw(
+    `/monthly-vessel-traffic-amount/v2/${YEAR}/MapServer/export`,
+    {
+      bbox: `${BB_X0},${BB_Y0},${BB_X1},${BB_Y1}`,
+      layers: "show:0",
+      size: `${RASTER_W},${RASTER_H}`,
+      f: "image",
+    }
+  );
   const blob = await res.blob();
   const bmp = await createImageBitmap(blob);
 
@@ -125,26 +157,15 @@ function drawTraffic() {
   map.drawBase();
   const ctx = map.ctx;
   ctx.globalCompositeOperation = "lighter";
-  // 非0画素だけを走査（O(非0画素数)）
+  // 非0画素だけを走査（O(非0画素数)）。事前描画したスプライトを lighter でブリット。
   for (let k = 0; k < activeIdx.length; k++) {
     const idx = activeIdx[k];
     const col = idx % RASTER_W;
     const row = (idx / RASTER_W) | 0;
     const [lon, lat] = pixelToLonLat(col, row);
     const [x, y] = map.toScreen(lon, lat);
-    const st = CLASS_STYLE[grid[idx] - 1];
-    // 過密ほど大きく灯る外側のにじみ
-    if (st.bloom) {
-      ctx.fillStyle = st.fillBloom;
-      ctx.beginPath();
-      ctx.arc(x, y, st.coreR * 2.4, 0, TWO_PI);
-      ctx.fill();
-    }
-    // 芯
-    ctx.fillStyle = st.fillCore;
-    ctx.beginPath();
-    ctx.arc(x, y, st.coreR, 0, TWO_PI);
-    ctx.fill();
+    const sp = CLASS_SPRITE[grid[idx] - 1];
+    ctx.drawImage(sp.canvas, x - sp.c, y - sp.c);
   }
   ctx.globalCompositeOperation = "source-over";
 }
