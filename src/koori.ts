@@ -1,7 +1,6 @@
 import "./style.css";
 import { arcgisQuery, msilFetchRaw } from "./api";
 import { JapanMap } from "./japanmap";
-import { speedColor } from "./render";
 import { mountNav } from "./nav";
 import { formatJst } from "./time";
 
@@ -32,9 +31,10 @@ let iceFeatures: IceFeature[] = [];
 
 /** 密接度フィールドを防御的に拾う（実データの名称が大小文字・和名で揺れるため） */
 function pickConc(p: Record<string, unknown>): number | null {
-  // キーを小文字化してから引く（全大文字など大小文字の揺れに強くする）
-  const low: Record<string, unknown> = {};
-  for (const k in p) low[k.toLowerCase()] = p[k];
+  // キーを小文字化してから引く（全大文字など大小文字の揺れに強くする）。
+  // 外部API由来のキー（__proto__ 等）でプロトタイプ汚染しないよう null プロトで正規化。
+  const low: Record<string, unknown> = Object.create(null);
+  for (const [k, v] of Object.entries(p)) low[k.toLowerCase()] = v;
   const raw =
     low.concentration ?? low["密接度"] ?? low.density ??
     low.value ?? low.gridcode ?? low.dn ?? null;
@@ -48,9 +48,19 @@ function centroid(rings: [number, number][][]): [number, number] {
   return n ? [sx / n, sy / n] : [0, 0];
 }
 
-/** 海氷は白。密接度があれば白の濃淡（薄氷→密氷で 0.78→1.0）、無ければ一様な白（0.9）。 */
-function iceTone(conc: number | null): number {
-  return conc != null ? 0.78 + 0.22 * Math.min(Math.max(conc / 100, 0), 1) : 0.9;
+/** 海氷レベル 0..1（薄氷→密氷）。密接度が取れなければ中庸の 0.7。 */
+function iceLevel(conc: number | null): number {
+  return conc != null ? Math.min(Math.max(conc / 100, 0), 1) : 0.7;
+}
+
+/**
+ * 海氷の色: 冷たい白。速度色ランプ（シアン系）ではなく白基調で、密なほど明るい白へ。
+ * かすかに青みを残して氷らしくしつつ、単一色相（白）の濃淡として表現する。
+ */
+function iceColor(t: number): [number, number, number] {
+  const lo: [number, number, number] = [150, 170, 190]; // 薄氷: 淡い青灰
+  const hi: [number, number, number] = [232, 242, 250]; // 密氷: ほぼ白
+  return [lo[0] + (hi[0] - lo[0]) * t, lo[1] + (hi[1] - lo[1]) * t, lo[2] + (hi[2] - lo[2]) * t];
 }
 
 async function fetchIce(): Promise<IceFeature[]> {
@@ -108,8 +118,8 @@ function draw() {
   map.drawBase();
   const ctx = map.ctx;
   for (const f of iceFeatures) {
-    const t = iceTone(f.conc);
-    const [r, g, b] = speedColor(t, 1);
+    const t = iceLevel(f.conc);
+    const [r, g, b] = iceColor(t);
     if (f.point) {
       ctx.globalCompositeOperation = "lighter";
       const [x, y] = map.toScreen(f.point[0], f.point[1]);
@@ -142,8 +152,8 @@ function drawLegend() {
   const ctx = legendCanvas.getContext("2d")!;
   for (let x = 0; x < legendCanvas.width; x++) {
     // 凡例は海氷の白のトーン帯（少→密）
-    const t = 0.78 + 0.22 * (x / legendCanvas.width);
-    const [r, g, b] = speedColor(t, 1);
+    const t = x / legendCanvas.width;
+    const [r, g, b] = iceColor(t);
     ctx.fillStyle = `rgb(${r | 0}, ${g | 0}, ${b | 0})`;
     ctx.fillRect(x, 0, 1, legendCanvas.height);
   }
