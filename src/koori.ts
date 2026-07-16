@@ -3,6 +3,7 @@ import { arcgisQuery, msilFetchRaw } from "./api";
 import { JapanMap } from "./japanmap";
 import { speedColor } from "./render";
 import { mountNav } from "./nav";
+import { formatJst } from "./time";
 
 mountNav("koori");
 
@@ -31,9 +32,12 @@ let iceFeatures: IceFeature[] = [];
 
 /** 密接度フィールドを防御的に拾う（実データの名称が大小文字・和名で揺れるため） */
 function pickConc(p: Record<string, unknown>): number | null {
+  // キーを小文字化してから引く（全大文字など大小文字の揺れに強くする）
+  const low: Record<string, unknown> = {};
+  for (const k in p) low[k.toLowerCase()] = p[k];
   const raw =
-    p.Concentration ?? p.concentration ?? p["密接度"] ?? p.Density ?? p.density ??
-    p.value ?? p.Value ?? p.gridcode ?? p.GRIDCODE ?? p.DN ?? null;
+    low.concentration ?? low["密接度"] ?? low.density ??
+    low.value ?? low.gridcode ?? low.dn ?? null;
   const n = typeof raw === "number" ? raw : raw != null && raw !== "" ? Number(raw) : NaN;
   return Number.isFinite(n) ? n : null;
 }
@@ -93,16 +97,10 @@ async function fetchIceTime(): Promise<string | null> {
     const raw = f?.attributes?.msilendtime ?? f?.properties?.msilendtime ?? null;
     if (raw == null) return null;
     const dt = new Date(typeof raw === "number" ? raw : Date.parse(raw));
-    return isNaN(dt.getTime()) ? null : fmtJst(dt);
+    return isNaN(dt.getTime()) ? null : formatJst(dt);
   } catch {
     return null;
   }
-}
-
-function fmtJst(d: Date): string {
-  const j = new Date(d.getTime() + 9 * 3600_000);
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${j.getUTCFullYear()}.${p(j.getUTCMonth() + 1)}.${p(j.getUTCDate())} ${p(j.getUTCHours())}:${p(j.getUTCMinutes())} JST`;
 }
 
 // ---- 描画 ----------------------------------------------------------------
