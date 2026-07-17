@@ -178,7 +178,9 @@ canvas.addEventListener("pointermove", (ev) => {
     tooltip.classList.add("visible");
     tooltip.style.left = `${ev.clientX + 14}px`;
     tooltip.style.top = `${ev.clientY + 14}px`;
-    tooltip.textContent = bestF.conc != null ? `密接度 ${Math.round(bestF.conc)} %` : "海氷";
+    // 表示も描画(iceLevel)と同じく 0..100 にクランプして整合させる
+    tooltip.textContent =
+      bestF.conc != null ? `密接度 ${Math.round(Math.min(Math.max(bestF.conc, 0), 100))} %` : "海氷";
   } else {
     tooltip.classList.remove("visible");
   }
