@@ -79,10 +79,16 @@ function seedParticles() {
   for (const sp of screenPaths) totalLen += sp.total;
   if (totalLen <= 0) return;
   // 全体で一定数の微光に抑える（経路数が多くても重くしない）。長い経路ほど多く灯る。
+  // 経路ごとに round すると丸め誤差が累積して予算を超えうるため、累積値の floor 差分で配分する。
   const BUDGET = 2400;
+  let acc = 0;
+  let placed = 0;
   for (let pi = 0; pi < screenPaths.length; pi++) {
     const sp = screenPaths[pi];
-    const count = Math.round((sp.total / totalLen) * BUDGET);
+    acc += (sp.total / totalLen) * BUDGET;
+    const target = Math.floor(acc);
+    const count = target - placed;
+    placed = target;
     for (let i = 0; i < count; i++) {
       particles.push({
         path: pi,
@@ -162,7 +168,8 @@ function tick(ts: number) {
     }
     const [hx, hy, seg] = posAt(sp, p.s, p.seg);
     p.seg = seg;
-    const [tx, ty] = posAt(sp, Math.max(p.s - p.tail, 0), 0);
+    // 尾も現在セグメントをヒントに（同一セグメント内なら累積弧長の先頭走査を省ける）
+    const [tx, ty] = posAt(sp, Math.max(p.s - p.tail, 0), p.seg);
     // 明るい個体はわずかに白波寄り、それ以外はシアン
     const c = p.bright > 0.82 ? "216, 255, 244" : "127, 227, 224";
     ctx.strokeStyle = `rgba(${c}, ${0.06 + p.bright * 0.26})`;
