@@ -12,6 +12,7 @@
 | [しおどき](https://ishikawa3.github.io/umi/tide.html) | 全国の検潮所が潮位で明滅する「呼吸する日本地図」＋潮位曲線 | 潮汐推算 v3 |
 | [こえ](https://ishikawa3.github.io/umi/koe.html) | 航行警報 — いま海で起きていることば | 航行警報 v2 |
 | [みち](https://ishikawa3.github.io/umi/michi.html) | 船舶通航量（AIS）を単一色相の航路の光として。主要港・海峡が動脈のように灯る | 船舶通航量 v2 |
+| [こおり](https://ishikawa3.github.io/umi/koori.html) | オホーツク海・北海道沖の海氷を白で。オフシーズンは「凍っていない」ことを静かに語る | 海氷 v2 |
 
 共通の道具立て:
 

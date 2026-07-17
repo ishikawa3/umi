@@ -3,6 +3,7 @@ import { fetchWaves, type WaveSample } from "./api";
 import { JapanMap, JAPAN_BBOX } from "./japanmap";
 import { speedColor } from "./render";
 import { mountNav } from "./nav";
+import { formatJst } from "./time";
 
 mountNav("nami");
 
@@ -29,11 +30,6 @@ function getBaseTime(): Date {
   return new Date(now.getTime() - 9 * 3600_000); // back to UTC
 }
 
-function fmtJst(d: Date): string {
-  const j = new Date(d.getTime() + 9 * 3600_000);
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${j.getUTCFullYear()}.${p(j.getUTCMonth() + 1)}.${p(j.getUTCDate())} ${p(j.getUTCHours())}:${p(j.getUTCMinutes())} JST`;
-}
 
 // ---- 描画 ----------------------------------------------------------------
 function drawWaves() {
@@ -122,7 +118,7 @@ async function boot() {
     samples = result;
     statusEl.textContent = "";
     const maxH = Math.max(...result.map((s) => s.height));
-    waveMetaEl.textContent = `最大有義波高 ${maxH.toFixed(1)} m（解析時刻: ${fmtJst(base)}）`;
+    waveMetaEl.textContent = `最大有義波高 ${maxH.toFixed(1)} m（解析時刻: ${formatJst(base)}）`;
     drawLegend();
     drawWaves();
   } catch {
