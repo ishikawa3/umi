@@ -172,6 +172,7 @@ body {
 
 /* 時刻スクラバ（潮流） */
 .time-ctl { display: inline-flex; align-items: center; gap: 0.5rem; min-width: 220px; }
+.time-ctl[hidden] { display: none; } /* 明示 display が [hidden] の display:none を上書きするため */
 .time-play {
   font-size: 0.66rem;
   color: var(--fg);

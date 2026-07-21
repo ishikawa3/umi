@@ -6,12 +6,14 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { latLonToVec3, vec3ToLatLon, EARTH_RADIUS } from "./geo";
+import { COASTLINE } from "./coastline";
 
 // 0.6 の配色トークン（3D側でも同じ値を使う）
 const SEA = new THREE.Color("#2fa5a0"); // 基調ティール（海）
 const SKY_LIGHT = new THREE.Color("#eef4f2"); // 空の淡色（半球光の上）
 const HAZE = new THREE.Color("#bfe0dc"); // 霞のパステル
 const GRATICULE = new THREE.Color("#3c6e69"); // 経緯線（低コントラスト）
+const COAST = new THREE.Color("#0e4a49"); // 海岸線（海より濃いティールで陸を縁取る）
 
 /** 日本近海に初期カメラを寄せるための代表点 */
 const JAPAN_LAT = 37;
@@ -67,11 +69,29 @@ export class Globe {
     this.ocean = new THREE.Mesh(oceanGeo, oceanMat);
     this.scene.add(this.ocean);
 
+    // --- 海岸線（日本近海。地理コンテキストを与える） ---
+    this.scene.add(this.buildCoastline());
+
     // --- 経緯線（30°ごと。低コントラストの細線） ---
     this.scene.add(this.buildGraticule());
 
     // --- 霞（背側フレネルのパステル。ネオンにしない） ---
     this.scene.add(this.buildHaze());
+  }
+
+  private buildCoastline(): THREE.LineSegments {
+    const pts: THREE.Vector3[] = [];
+    const R = EARTH_RADIUS * 1.002; // 海面(1)のすぐ上。裏側は海に隠れる（depthTest）
+    for (const line of COASTLINE) {
+      // フラット配列 [lon,lat,lon,lat,…] を連続する線分に展開
+      for (let i = 0; i + 3 < line.length; i += 2) {
+        pts.push(latLonToVec3(line[i + 1], line[i], R));
+        pts.push(latLonToVec3(line[i + 3], line[i + 2], R));
+      }
+    }
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat = new THREE.LineBasicMaterial({ color: COAST, transparent: true, opacity: 0.7 });
+    return new THREE.LineSegments(geo, mat);
   }
 
   private buildGraticule(): THREE.LineSegments {
