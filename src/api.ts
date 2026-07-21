@@ -207,3 +207,91 @@ export async function fetchWaves(bbox: [number, number, number, number]): Promis
   }
   return out;
 }
+
+export interface NavWarning {
+  /** 例 "06-260085 豊後水道、灯台消灯" */
+  name: string;
+  /** HTMLを除去した電文本文 */
+  body: string;
+  lon: number;
+  lat: number;
+  /** 警報番号（並び順用。名称先頭の "06-260085" から 260085 を抽出） */
+  num: number;
+}
+
+/** HTML混じりの電文をプレーンテキストへ（こえ・かいしょう共通） */
+function cleanWarningBody(html: string): string {
+  return (html ?? "")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/^\s*[［\[].*?[］\]]\s*$/gm, "") // リンク由来の「[利用上の制限事項]」等
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/** "06-260085 豊後水道、…" → 260085 */
+function warningNumber(name: string): number {
+  const m = /^\d{2}-(\d+)/.exec(name ?? "");
+  return m ? Number(m[1]) : 0;
+}
+
+/** 点/面ジオメトリの代表点（重心） */
+function geomCentroid(geom: any): [number, number] | null {
+  if (geom.type === "Point") return [geom.coordinates[0], geom.coordinates[1]];
+  let ring: [number, number][] | null = null;
+  if (geom.type === "Polygon") ring = geom.coordinates[0];
+  else if (geom.type === "MultiPolygon") ring = geom.coordinates[0]?.[0];
+  if (!ring?.length) return null;
+  let sx = 0;
+  let sy = 0;
+  for (const [x, y] of ring) {
+    sx += x;
+    sy += y;
+  }
+  return [sx / ring.length, sy / ring.length];
+}
+
+async function fetchNavLayer(
+  layer: number,
+  bbox: [number, number, number, number]
+): Promise<NavWarning[]> {
+  const out: NavWarning[] = [];
+  // 1000件超に備えてページング
+  for (let offset = 0; offset < 5000; offset += 1000) {
+    const gj = await arcgisQuery("navigational-warnings/v2", layer, bbox,
+      offset ? { resultOffset: String(offset) } : {});
+    for (const f of gj.features ?? []) {
+      const c = geomCentroid(f.geometry);
+      if (!c) continue;
+      const name = f.properties.name ?? f.properties.Name ?? "";
+      out.push({
+        name,
+        body: cleanWarningBody(f.properties.description ?? f.properties.Description),
+        lon: c[0],
+        lat: c[1],
+        num: warningNumber(name),
+      });
+    }
+    if (!gj.exceededTransferLimit) break;
+  }
+  return out;
+}
+
+/**
+ * 航行警報（navigational-warnings/v2）を取得する。層1=点・層3=面。
+ * 片方の層が失敗しても残りは返す（Promise.allSettled）。
+ * こえ（src/koe.ts）と かいしょう（console）の共通データ源。
+ */
+export async function fetchNavWarnings(
+  bbox: [number, number, number, number]
+): Promise<NavWarning[]> {
+  const results = await Promise.allSettled([fetchNavLayer(1, bbox), fetchNavLayer(3, bbox)]);
+  const out: NavWarning[] = [];
+  for (const r of results) {
+    if (r.status === "fulfilled") out.push(...r.value);
+  }
+  return out;
+}

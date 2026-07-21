@@ -1,5 +1,5 @@
 import "./style.css";
-import { arcgisQuery } from "./api";
+import { fetchNavWarnings } from "./api";
 import { JapanMap, JAPAN_BBOX } from "./japanmap";
 import { mountNav } from "./nav";
 
@@ -56,66 +56,6 @@ let warnings: Warning[] = [];
 let highlighted: Warning | null = null;
 // D-2: アクティブなフィルタ（null = 全件表示）
 let activeFilter: string | null = null;
-
-/** HTML混じりの電文をプレーンテキストへ */
-function cleanDescription(html: string): string {
-  return (html ?? "")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/^\s*[［\[].*?[］\]]\s*$/gm, "") // リンク由来の「[利用上の制限事項]」等
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
-/** "06-260085 豊後水道、…" → 260085 */
-function warningNumber(name: string): number {
-  const m = /^\d{2}-(\d+)/.exec(name ?? "");
-  return m ? Number(m[1]) : 0;
-}
-
-function centroid(geom: any): [number, number] | null {
-  if (geom.type === "Point") return [geom.coordinates[0], geom.coordinates[1]];
-  let ring: [number, number][] | null = null;
-  if (geom.type === "Polygon") ring = geom.coordinates[0];
-  else if (geom.type === "MultiPolygon") ring = geom.coordinates[0]?.[0];
-  if (!ring?.length) return null;
-  let sx = 0;
-  let sy = 0;
-  for (const [x, y] of ring) {
-    sx += x;
-    sy += y;
-  }
-  return [sx / ring.length, sy / ring.length];
-}
-
-async function fetchLayer(layer: number): Promise<Warning[]> {
-  const out: Warning[] = [];
-  // 1000件超に備えてページング
-  for (let offset = 0; offset < 5000; offset += 1000) {
-    const gj = await arcgisQuery("navigational-warnings/v2", layer, JAPAN_BBOX,
-      offset ? { resultOffset: String(offset) } : {});
-    for (const f of gj.features ?? []) {
-      const c = centroid(f.geometry);
-      if (!c) continue;
-      const name = f.properties.name ?? "";
-      const body = cleanDescription(f.properties.description);
-      out.push({
-        name,
-        body,
-        lon: c[0],
-        lat: c[1],
-        num: warningNumber(name),
-        seed: Math.random() * Math.PI * 2,
-        category: detectCategory(name, body),
-      });
-    }
-    if (!gj.exceededTransferLimit) break;
-  }
-  return out;
-}
 
 // ---- 描画 --------------------------------------------------------------
 function visibleWarnings(): Warning[] {
@@ -251,14 +191,12 @@ window.addEventListener("resize", () => map.resize());
 async function boot() {
   statusEl.textContent = "航行警報を取得中…";
   try {
-    const [pointsResult, polysResult] = await Promise.allSettled([
-      fetchLayer(1),
-      fetchLayer(3),
-    ]).then((r) => r);
-    warnings = [
-      ...(pointsResult.status === "fulfilled" ? pointsResult.value : []),
-      ...(polysResult.status === "fulfilled" ? polysResult.value : []),
-    ];
+    const raw = await fetchNavWarnings(JAPAN_BBOX);
+    warnings = raw.map((r) => ({
+      ...r,
+      seed: Math.random() * Math.PI * 2,
+      category: detectCategory(r.name, r.body),
+    }));
     await map.init();
   } catch {
     statusEl.textContent = "海しるAPIに接続できませんでした";
