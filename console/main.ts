@@ -9,6 +9,7 @@ import "./style.css";
 import { fetchAreas, fetchNavWarnings, fetchCurrents, fetchWaves, type Area } from "../src/api";
 import { VectorField } from "../src/field";
 import { TIME_SPAN_BACK_H, TIME_SPAN_FWD_H, TIME_STEP_MIN } from "../src/config";
+import { formatJst } from "../src/time";
 import { Globe } from "./scene";
 import { WarningsLayer, CATEGORIES, toConsoleWarnings, type ConsoleWarning } from "./warnings";
 import { WavesLayer } from "./waves";
@@ -59,11 +60,11 @@ let head = (TIME_SPAN_BACK_H * 60) / TIME_STEP_MIN;
 timeSlider.min = "0";
 timeSlider.max = String(steps);
 timeSlider.value = String(head);
-const stepToDate = (s: number) => new Date(t0 + Math.round(s) * STEP_MS);
-function fmtJst(d: Date): string {
-  const j = new Date(d.getTime() + 9 * 3600_000);
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${p(j.getUTCMonth() + 1)}/${p(j.getUTCDate())} ${p(j.getUTCHours())}:${p(j.getUTCMinutes())} JST`;
+// 判定・表示・取得はすべて Math.round(head) の整数ステップで統一する（丸めの不整合回避）
+const roundStep = () => Math.round(head);
+const stepDate = (step: number) => new Date(t0 + step * STEP_MS);
+function stepLabel(step: number): void {
+  timeLabel.textContent = formatJst(stepDate(step)); // 他画面と同じ書式に統一
 }
 
 // ---- ズーム表示 ----------------------------------------------------------
@@ -252,29 +253,38 @@ let currentArea: Area | null = null;
 let areasList: Area[] = [];
 let currentsInit = false;
 let wavesInit = false;
+let currentStep = roundStep(); // いま読み込み中／表示中の整数ステップ
+let loadEpoch = 0; // 非同期取得の世代（古い結果で上書きしないための番兵）
 const fieldCache = new Map<string, VectorField>();
 
 async function loadField(area: Area, step: number): Promise<VectorField> {
   const key = `${area.code}:${step}`;
   const cached = fieldCache.get(key);
   if (cached) return cached;
-  const samples = await fetchCurrents(area.code, stepToDate(step));
+  const samples = await fetchCurrents(area.code, stepDate(step));
   const f = new VectorField(samples);
   fieldCache.set(key, f);
   return f;
 }
+/** currentArea / currentStep の場を取得して反映。await 後に状態が変わっていたら破棄。 */
 async function applyStep(): Promise<void> {
-  if (!currentArea) return;
+  const area = currentArea;
+  const step = currentStep;
+  if (!area) return;
+  const myEpoch = ++loadEpoch;
   try {
-    const f = await loadField(currentArea, Math.round(head));
+    const f = await loadField(area, step);
+    // 解決後、まだ最新の要求（同世代・同海域・同ステップ）である場合のみ反映
+    if (myEpoch !== loadEpoch || currentArea !== area || currentStep !== step) return;
     currents.setField(f);
     updateLegend();
   } catch { /* 取得失敗時は前の場のまま */ }
-  timeLabel.textContent = fmtJst(stepToDate(head));
 }
 async function selectArea(area: Area): Promise<void> {
   currentArea = area;
   currents.setArea(area);
+  currentStep = roundStep();
+  stepLabel(currentStep);
   await applyStep();
 }
 async function ensureCurrents(): Promise<void> {
@@ -312,7 +322,13 @@ areaSelect.addEventListener("change", () => {
 });
 timeSlider.addEventListener("input", () => {
   head = Number(timeSlider.value);
-  void applyStep();
+  const step = roundStep();
+  stepLabel(step);
+  // 丸め後のステップが変わったときだけ取得（ドラッグ中の同一ステップ多発を防ぐ）
+  if (step !== currentStep) {
+    currentStep = step;
+    void applyStep();
+  }
 });
 
 // ---- 時刻の再生 ----------------------------------------------------------
@@ -328,12 +344,16 @@ globe.onFrame((ms) => {
   const dt = Math.min((ms - lastMs) / 1000, 0.1);
   lastMs = ms;
   if (timePlaying && currents.isVisible() && currentArea) {
-    const prev = head;
     head += dt / 10; // 実時間10秒 ≈ 1コマ（30分）
     if (head >= steps) head = 0;
     timeSlider.value = String(head);
-    if (Math.floor(head) !== Math.floor(prev)) void applyStep();
-    else timeLabel.textContent = fmtJst(stepToDate(head));
+    const step = roundStep();
+    stepLabel(step); // 表示は常に丸めステップに一致
+    // 判定・取得も同じ丸めステップで（floor/round の不整合を解消）
+    if (step !== currentStep) {
+      currentStep = step;
+      void applyStep();
+    }
   }
   currents.update(dt);
 });
