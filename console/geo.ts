@@ -38,7 +38,9 @@ export function projectToScreen(
   height: number
 ): { x: number; y: number } | null {
   const p = v.clone().project(camera);
-  if (p.z > 1) return null; // クリップ面より奥（裏側）
+  // NDC の z が [-1, 1] の外はクリップ範囲外（z>1: カメラ裏側/近クリップ手前、
+  // z<-1: 遠クリップより奥）。どちらも画面座標として無効なので弾く。
+  if (p.z < -1 || p.z > 1) return null;
   return {
     x: (p.x * 0.5 + 0.5) * width,
     y: (-p.y * 0.5 + 0.5) * height,
