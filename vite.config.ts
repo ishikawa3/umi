@@ -16,6 +16,8 @@ export default defineConfig({
         michi: resolve(__dirname, "michi.html"),
         koori: resolve(__dirname, "koori.html"),
         suji: resolve(__dirname, "suji.html"),
+        // かいしょう（業務システム風・three.js）は独立サイトとして同居（PLAN4）
+        console: resolve(__dirname, "console/index.html"),
       },
     },
   },
