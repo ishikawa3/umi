@@ -96,7 +96,19 @@ body {
   overflow: auto;
 }
 .panel.left { border-right: 1px solid var(--line); }
-.panel.right { border-left: 1px solid var(--line); }
+.panel.right {
+  border-left: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.panel h2 .count {
+  font-family: var(--mono);
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--ok);
+  text-transform: none;
+}
 .panel h2 {
   font-size: 0.7rem;
   font-weight: 600;
@@ -149,13 +161,89 @@ body {
   margin-top: 0.2rem;
 }
 
+/* 種別フィルタ */
+#filter-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.2rem 1rem 1rem;
+}
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--sans);
+  font-size: 0.74rem;
+  color: var(--fg);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.22rem 0.6rem;
+  cursor: pointer;
+}
+.filter-chip.active {
+  border-color: var(--chip-color, var(--ok));
+  box-shadow: inset 0 0 0 1px var(--chip-color, var(--ok));
+}
+.chip-dot { width: 7px; height: 7px; border-radius: 50%; }
+
+/* 航行警報一覧 */
+.warning-list {
+  flex: 1 1 55%;
+  min-height: 0;
+  overflow: auto;
+  border-bottom: 1px solid var(--line);
+}
+.warn-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  text-align: left;
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  color: var(--fg);
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--line);
+  padding: 0.42rem 1rem;
+  cursor: pointer;
+}
+.warn-row:first-child { border-top: none; }
+.warn-row:hover, .warn-row.hot { background: rgba(47, 165, 160, 0.1); }
+.warn-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; }
+.warn-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* インスペクタ */
 .inspector-body {
+  flex: 1 1 45%;
+  min-height: 0;
+  overflow: auto;
   padding: 0.4rem 1rem 1rem;
   font-size: 0.82rem;
-  line-height: 1.7;
+  line-height: 1.6;
   color: var(--fg-dim);
 }
+.inspector-body.has-detail { color: var(--fg); }
+.insp-cat {
+  display: inline-block;
+  font-size: 0.68rem;
+  color: var(--chip-color, var(--ok));
+  border: 1px solid var(--chip-color, var(--ok));
+  border-radius: 999px;
+  padding: 0.05rem 0.5rem;
+  margin: 0.2rem 0 0.6rem;
+}
+.insp-field { margin-bottom: 0.6rem; }
+.insp-k {
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  color: var(--fg-dim);
+  text-transform: uppercase;
+  margin-bottom: 0.15rem;
+}
+.insp-v { font-size: 0.82rem; color: var(--fg); }
+.insp-v.mono { font-family: var(--mono); white-space: pre-wrap; word-break: break-word; }
 
 /* ---- ステータスバー ---- */
 .statusbar {
@@ -173,10 +261,24 @@ body {
   flex: 1;
   overflow: hidden;
   white-space: nowrap;
-  text-overflow: ellipsis;
   color: var(--fg-dim);
   border-left: 1px solid var(--line);
   padding-left: 1.2rem;
+  position: relative;
+  mask-image: linear-gradient(90deg, transparent 0, #000 2rem, #000 calc(100% - 2rem), transparent 100%);
+}
+.ticker-inner {
+  display: inline-block;
+  white-space: nowrap;
+  will-change: transform;
+  animation: ticker-scroll 60s linear infinite;
+}
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ticker-inner { animation: none; }
 }
 
 /* ---- クレジット（法的義務・常時表示） ---- */

@@ -26,6 +26,7 @@ export class Globe {
   private readonly ocean: THREE.Mesh;
   private readonly raycaster = new THREE.Raycaster();
   private readonly el: HTMLElement;
+  private readonly frameCbs: ((tMs: number) => void)[] = [];
 
   constructor(container: HTMLElement) {
     this.el = container;
@@ -71,9 +72,6 @@ export class Globe {
 
     // --- 霞（背側フレネルのパステル。ネオンにしない） ---
     this.scene.add(this.buildHaze());
-
-    // --- テストマーカー（東京。フェーズ14の疎通確認用） ---
-    this.scene.add(this.buildTestMarker(35.68, 139.77));
   }
 
   private buildGraticule(): THREE.LineSegments {
@@ -132,26 +130,38 @@ export class Globe {
     return new THREE.Mesh(geo, mat);
   }
 
-  private buildTestMarker(lat: number, lon: number): THREE.Mesh {
-    const geo = new THREE.SphereGeometry(0.014, 16, 16);
-    // 海のティールに沈まないよう、淡いパステルで「灯った点」に見せる
-    const mat = new THREE.MeshBasicMaterial({ color: HAZE });
-    const m = new THREE.Mesh(geo, mat);
-    m.position.copy(latLonToVec3(lat, lon, EARTH_RADIUS * 1.015));
-    m.name = "test-marker";
-    return m;
-  }
-
   /** ポインタ位置(canvas内CSS座標)の海面が指す緯度経度。海に当たらなければ null */
   latLonAtPointer(cssX: number, cssY: number): { lat: number; lon: number } | null {
+    this.raycaster.setFromCamera(this.pointerToNdc(cssX, cssY), this.camera);
+    const hit = this.raycaster.intersectObject(this.ocean, false)[0];
+    return hit ? vec3ToLatLon(hit.point) : null;
+  }
+
+  private pointerToNdc(cssX: number, cssY: number): THREE.Vector2 {
     const rect = this.renderer.domElement.getBoundingClientRect();
-    const ndc = new THREE.Vector2(
+    return new THREE.Vector2(
       ((cssX - rect.left) / rect.width) * 2 - 1,
       -((cssY - rect.top) / rect.height) * 2 + 1
     );
-    this.raycaster.setFromCamera(ndc, this.camera);
-    const hit = this.raycaster.intersectObject(this.ocean, false)[0];
-    return hit ? vec3ToLatLon(hit.point) : null;
+  }
+
+  /** レイヤが自前のオブジェクトを載せる（Group等） */
+  add(obj: THREE.Object3D): void {
+    this.scene.add(obj);
+  }
+
+  /**
+   * ポインタ位置で対象オブジェクト群にレイキャストし、最も手前の交差を返す。
+   * 地球儀の裏側（海の陰）に隠れた点は呼び出し側で isFacingCamera により除外する。
+   */
+  raycastAt(cssX: number, cssY: number, objects: THREE.Object3D[]): THREE.Intersection[] {
+    this.raycaster.setFromCamera(this.pointerToNdc(cssX, cssY), this.camera);
+    return this.raycaster.intersectObjects(objects, false);
+  }
+
+  /** 毎フレーム呼ばれるコールバックを登録（レイヤのアニメーション用） */
+  onFrame(cb: (tMs: number) => void): void {
+    this.frameCbs.push(cb);
   }
 
   /** カメラ距離（ズーム指標。UIのステータスバー表示に使う） */
@@ -167,8 +177,9 @@ export class Globe {
     this.renderer.setSize(w, h);
   }
 
-  private frame = (): void => {
+  private frame = (tMs: number): void => {
     this.controls.update();
+    for (const cb of this.frameCbs) cb(tMs);
     this.renderer.render(this.scene, this.camera);
     requestAnimationFrame(this.frame);
   };
