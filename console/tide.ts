@@ -73,6 +73,8 @@ export class TideLayer {
 
   setVisible(v: boolean): void { this.group.visible = v; }
   isVisible(): boolean { return this.group.visible; }
+  /** 現在の各棒の先端（ヘッド）の世界座標。潮位で高さが変わるためクラスタ位置に使う */
+  headPositions(): readonly THREE.Vector3[] { return this.tops; }
   onHighlight(cb: (index: number) => void): void { this.onHighlightCb = cb; }
   count(): number { return this.entries.length; }
   entryAt(index: number): TideEntry | null { return this.entries[index] ?? null; }

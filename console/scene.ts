@@ -7,13 +7,15 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { latLonToVec3, vec3ToLatLon, EARTH_RADIUS } from "./geo";
 import { COASTLINE } from "./coastline";
+import { LAND } from "./land";
 
 // 配色トークン（ダーク管制センター）。暗い海に明るいデータを浮かせる
 const SEA = new THREE.Color("#0f2c44"); // 深い藍墨の海（暗いほどデータが映える）
+const LAND_COLOR = new THREE.Color("#34556e"); // 陸（海より明るいスレートで地形を見せる）
 const SKY_LIGHT = new THREE.Color("#2b4d66"); // 半球光の上（薄明の空）
 const HAZE = new THREE.Color("#3d7d92"); // 大気の縁光（シアン寄り）
 const GRATICULE = new THREE.Color("#33607a"); // 経緯線（低コントラスト）
-const COAST = new THREE.Color("#5a8aa4"); // 海岸線（明るいシアングレーで陸をくっきり縁取る）
+const COAST = new THREE.Color("#7fb4cc"); // 海岸線（明るいシアングレーで陸をくっきり縁取る）
 
 /** 日本近海に初期カメラを寄せるための代表点 */
 const JAPAN_LAT = 37;
@@ -59,15 +61,31 @@ export class Globe {
     key.position.set(-1.1, 0.9, 0.7);
     this.scene.add(key);
 
-    // --- 海（地球本体）: つや消しの藍墨の球 ---
+    // --- 海の深度プリパス: 色は書かず深度だけ書き込む球。
+    //     半透明の海は不透明パスから外れて裏側を隠せないため、先にこの球で
+    //     海面の深度を書き、裏側（地球の反対側）のジオメトリを depthTest で隠す。 ---
+    const oceanDepth = new THREE.Mesh(
+      new THREE.SphereGeometry(EARTH_RADIUS * 0.999, 64, 64),
+      new THREE.MeshBasicMaterial({ colorWrite: false })
+    );
+    oceanDepth.renderOrder = -1; // 他より先に深度を確定させる
+    this.scene.add(oceanDepth);
+
+    // --- 海（地球本体）: つや消しの藍墨の球。少し透明にしてガラス質の質感に ---
     const oceanGeo = new THREE.SphereGeometry(EARTH_RADIUS, 96, 96);
     const oceanMat = new THREE.MeshStandardMaterial({
       color: SEA,
       roughness: 1,
       metalness: 0,
+      transparent: true,
+      opacity: 0.82,      // 「少し透明」＝ガラス質の質感
+      depthWrite: false,  // 深度はプリパスが担当（自身は書かない）
     });
     this.ocean = new THREE.Mesh(oceanGeo, oceanMat);
     this.scene.add(this.ocean);
+
+    // --- 陸（塗り）: 地形（陸のかたち）が分かるように海より明るいスレートで塗る ---
+    this.scene.add(this.buildLand());
 
     // --- 海岸線（日本近海。地理コンテキストを与える） ---
     this.scene.add(this.buildCoastline());
@@ -77,6 +95,32 @@ export class Globe {
 
     // --- 大気の縁光（背側フレネルの cyan haze。ネオンにしない） ---
     this.scene.add(this.buildHaze());
+  }
+
+  private buildLand(): THREE.Mesh {
+    const R = EARTH_RADIUS * 1.0015; // 海面のすぐ上に薄く載せる
+    const positions: number[] = [];
+    for (const flat of LAND) {
+      const contour: THREE.Vector2[] = [];
+      for (let i = 0; i + 1 < flat.length; i += 2) contour.push(new THREE.Vector2(flat[i], flat[i + 1]));
+      if (contour.length < 3) continue;
+      // 経緯度平面で三角形分割 → 各頂点を球面へ写す（日本域は小さく曲率の影響は軽微）
+      let faces: number[][];
+      try { faces = THREE.ShapeUtils.triangulateShape(contour, []); } catch { continue; }
+      for (const f of faces) {
+        for (const idx of f) {
+          const v = latLonToVec3(contour[idx].y, contour[idx].x, R);
+          positions.push(v.x, v.y, v.z);
+        }
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geo.computeVertexNormals();
+    const mat = new THREE.MeshStandardMaterial({
+      color: LAND_COLOR, roughness: 1, metalness: 0, side: THREE.DoubleSide,
+    });
+    return new THREE.Mesh(geo, mat);
   }
 
   private buildCoastline(): THREE.LineSegments {
