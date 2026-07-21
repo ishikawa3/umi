@@ -58,11 +58,26 @@
         </div>
       </main>
 
-      <aside class="panel right" aria-label="航行警報一覧とインスペクタ">
-        <h2>航行警報一覧 <span class="count" id="warn-count"></span></h2>
-        <div class="warning-list" id="warning-list"></div>
-        <h2>インスペクタ</h2>
-        <div class="inspector-body" id="inspector-body">対象未選択</div>
+      <aside class="panel right" aria-label="詳細パネル">
+        <div class="rp-tabs" id="rp-tabs"></div>
+
+        <div class="rp-panel" id="rp-warnings">
+          <h2>航行警報一覧 <span class="count" id="warn-count"></span></h2>
+          <div class="warning-list" id="warning-list"></div>
+          <h2>インスペクタ</h2>
+          <div class="inspector-body" id="inspector-body">対象未選択</div>
+        </div>
+
+        <div class="rp-panel" id="rp-tide" hidden>
+          <h2>検潮所 <span class="count" id="tide-count"></span></h2>
+          <div class="tide-table" id="tide-table"></div>
+          <h2>潮位曲線</h2>
+          <div class="tide-detail" id="tide-detail">
+            <div class="tide-name" id="tide-name">検潮所を選択</div>
+            <canvas id="tide-curve" width="300" height="120"></canvas>
+            <div class="tide-hilo" id="tide-hilo"></div>
+          </div>
+        </div>
       </aside>
     </div>
 

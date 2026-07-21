@@ -6,7 +6,10 @@
 // データ層は うみ本体の src/api.ts を共有する（PLAN4 0.1）。
 
 import "./style.css";
-import { fetchAreas, fetchNavWarnings, fetchCurrents, fetchWaves, type Area } from "../src/api";
+import {
+  fetchAreas, fetchNavWarnings, fetchCurrents, fetchWaves,
+  fetchTideStations, fetchTideDay, type Area, type TideStation,
+} from "../src/api";
 import { VectorField } from "../src/field";
 import { TIME_SPAN_BACK_H, TIME_SPAN_FWD_H, TIME_STEP_MIN } from "../src/config";
 import { formatJst } from "../src/time";
@@ -14,6 +17,7 @@ import { Globe } from "./scene";
 import { WarningsLayer, CATEGORIES, toConsoleWarnings, type ConsoleWarning } from "./warnings";
 import { WavesLayer } from "./waves";
 import { CurrentsLayer, compass8 } from "./currents";
+import { TideLayer, tideAt, tideNorm, type TideEntry } from "./tide";
 
 const JAPAN_BBOX: [number, number, number, number] = [122, 24, 148, 46];
 
@@ -40,6 +44,12 @@ const timeSlider = $("time-slider") as HTMLInputElement;
 const timeLabel = $("time-label");
 const timePlayBtn = $("time-play") as HTMLButtonElement;
 const tooltip = $("tooltip");
+const rpTabs = $("rp-tabs");
+const tideTableEl = $("tide-table");
+const tideCountEl = $("tide-count");
+const tideNameEl = $("tide-name");
+const tideHiloEl = $("tide-hilo");
+const tideCurveEl = $("tide-curve") as HTMLCanvasElement;
 
 // ---- 3D 海図とレイヤ -----------------------------------------------------
 const globe = new Globe(chartEl);
@@ -49,6 +59,7 @@ window.addEventListener("resize", () => globe.resize());
 const warnings = new WarningsLayer(globe);
 const waves = new WavesLayer(globe);
 const currents = new CurrentsLayer(globe);
+const tide = new TideLayer(globe);
 
 // ---- 時間軸（潮流用。config を流用） ------------------------------------
 const STEP_MS = TIME_STEP_MIN * 60_000;
@@ -97,7 +108,7 @@ interface LayerDef {
 }
 const LAYERS: LayerDef[] = [
   { key: "warnings", label: "航行警報", phase: "P15", live: true, checked: true,
-    onToggle: (v) => { warnings.setVisible(v); warnFilterSection.hidden = !v; } },
+    onToggle: (v) => { warnings.setVisible(v); warnFilterSection.hidden = !v; updateRightTabs(v ? "warnings" : null); } },
   { key: "currents", label: "潮流", phase: "P16", live: true,
     onToggle: (v) => {
       currents.setVisible(v);
@@ -108,7 +119,8 @@ const LAYERS: LayerDef[] = [
     } },
   { key: "waves", label: "波浪", phase: "P16", live: true,
     onToggle: (v) => { waves.setVisible(v); updateLegend(); if (v) void ensureWaves(); } },
-  { key: "tide", label: "検潮所", phase: "P17" },
+  { key: "tide", label: "検潮所", phase: "P17", live: true,
+    onToggle: (v) => { tide.setVisible(v); updateRightTabs(v ? "tide" : null); if (v) void ensureTide(); } },
   { key: "traffic", label: "通航量", phase: "P18" },
 ];
 function buildLayerPanel(): void {
@@ -133,6 +145,36 @@ function buildLayerPanel(): void {
   }
 }
 buildLayerPanel();
+
+// ---- 右パネルのタブ（航行警報 / 検潮所） --------------------------------
+type RightTab = "warnings" | "tide";
+const RIGHT_PANELS: { key: RightTab; label: string; el: string; visible: () => boolean }[] = [
+  { key: "warnings", label: "航行警報", el: "rp-warnings", visible: () => warnings.isVisible() },
+  { key: "tide", label: "検潮所", el: "rp-tide", visible: () => tide.isVisible() },
+];
+let activeTab: RightTab | null = "warnings";
+
+/** レイヤのON/OFFに応じて右パネルのタブを再構成。prefer を最前面にする */
+function updateRightTabs(prefer: RightTab | null): void {
+  const avail = RIGHT_PANELS.filter((p) => p.visible());
+  if (prefer && avail.some((p) => p.key === prefer)) activeTab = prefer;
+  if (!avail.some((p) => p.key === activeTab)) activeTab = avail[0]?.key ?? null;
+
+  rpTabs.textContent = "";
+  rpTabs.hidden = avail.length <= 1;
+  for (const p of avail) {
+    const btn = document.createElement("button");
+    btn.className = "rp-tab" + (p.key === activeTab ? " active" : "");
+    btn.textContent = p.label;
+    btn.setAttribute("aria-pressed", String(p.key === activeTab));
+    btn.addEventListener("click", () => { activeTab = p.key; updateRightTabs(p.key); });
+    rpTabs.appendChild(btn);
+  }
+  for (const p of RIGHT_PANELS) {
+    ($(p.el) as HTMLElement).hidden = p.key !== activeTab || !p.visible();
+  }
+}
+updateRightTabs("warnings"); // 初期状態（航行警報のみ表示）を反映
 
 // ---- 凡例（アクティブなレイヤに追従） ------------------------------------
 function legendBar(label: string, cLow: string, cHigh: string, lo: string, hi: string): string {
@@ -316,6 +358,209 @@ async function ensureWaves(): Promise<void> {
   } catch { wavesInit = false; }
 }
 
+// ---- 検潮所（フェーズ17） -----------------------------------------------
+let tideInit = false;
+let tideEntries: TideEntry[] = [];
+let tideSort: "name" | "level" | "trend" = "level";
+let tideSelected = -1;
+const MINUTES = 1440;
+
+function jstNow(): Date { return new Date(Date.now() + 9 * 3600_000); }
+function jstMinute(): number { const n = jstNow(); return n.getUTCHours() * 60 + n.getUTCMinutes(); }
+function jstDateStr(): string {
+  const n = jstNow();
+  const p = (x: number, w = 2) => String(x).padStart(w, "0");
+  return p(n.getUTCFullYear(), 4) + p(n.getUTCMonth() + 1) + p(n.getUTCDate());
+}
+function fmtMinute(minute: number): string {
+  const h = Math.floor(minute / 60) % 24;
+  const m = Math.floor(minute % 60);
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/** 全国の検潮所を緯度経度グリッドで代表局に間引く（負荷配慮） */
+function thinStations(all: TideStation[], cap = 60): TideStation[] {
+  const cell = 1.2;
+  const picked = new Map<string, TideStation>();
+  for (const s of all) {
+    const key = `${Math.floor(s.lon / cell)},${Math.floor(s.lat / cell)}`;
+    if (!picked.has(key)) picked.set(key, s);
+  }
+  let out = [...picked.values()];
+  if (out.length > cap) {
+    const step = out.length / cap;
+    out = Array.from({ length: cap }, (_, i) => out[Math.floor(i * step)]);
+  }
+  return out;
+}
+
+async function ensureTide(): Promise<void> {
+  if (tideInit) return;
+  tideInit = true;
+  tideCountEl.textContent = "取得中…";
+  try {
+    const all = await fetchTideStations();
+    const shown = thinStations(all);
+    const date = jstDateStr();
+    tideEntries = shown.map((station) => ({ station, day: null }));
+    tide.setData(tideEntries);
+    // 12件ずつのバッチで当日潮位を取得（429を避ける）
+    for (let i = 0; i < tideEntries.length; i += 12) {
+      const batch = tideEntries.slice(i, i + 12);
+      await Promise.all(batch.map(async (e) => {
+        try { const d = await fetchTideDay(e.station.code, date); if (d.tide.length) e.day = d; } catch { /* skip */ }
+      }));
+      tide.refresh(jstMinute());
+      buildTideTable();
+      tideCountEl.textContent = i + 12 < tideEntries.length
+        ? `取得中 ${Math.min(i + 12, tideEntries.length)}/${tideEntries.length}` : `${tideEntries.length}局`;
+    }
+    tide.refresh(jstMinute());
+    buildTideTable();
+  } catch {
+    tideInit = false;
+    tideCountEl.textContent = "取得失敗";
+  }
+}
+
+function tideTrend(e: TideEntry, minute: number): number {
+  if (!e.day) return 0;
+  return tideAt(e.day, minute) - tideAt(e.day, Math.max(0, minute - 10));
+}
+
+function buildTideTable(): void {
+  const minute = jstMinute();
+  const rows = tideEntries.map((e, i) => ({
+    e, i,
+    cm: e.day ? tideAt(e.day, minute) : null,
+    norm: e.day ? tideNorm(e.day, minute) : -1,
+    trend: tideTrend(e, minute),
+  }));
+  rows.sort((a, b) => {
+    if (tideSort === "name") return a.e.station.nameJa.localeCompare(b.e.station.nameJa, "ja");
+    if (tideSort === "trend") return b.trend - a.trend;
+    return b.norm - a.norm; // level: 正規化潮位の高い順
+  });
+
+  tideTableEl.textContent = "";
+  const header = document.createElement("div");
+  header.className = "tide-row tide-head";
+  for (const [key, label] of [["name", "検潮所"], ["level", "潮位"], ["trend", "増減"]] as const) {
+    const c = document.createElement("button");
+    c.className = "tide-cell th" + (tideSort === key ? " sorted" : "");
+    c.textContent = label;
+    c.addEventListener("click", () => { tideSort = key; buildTideTable(); });
+    header.appendChild(c);
+  }
+  tideTableEl.appendChild(header);
+
+  tideRowByEntry = [];
+  for (const r of rows) {
+    const row = document.createElement("button");
+    row.className = "tide-row" + (r.i === tideSelected ? " hot" : "");
+    row.dataset.eindex = String(r.i);
+    const name = document.createElement("span");
+    name.className = "tide-cell name";
+    name.textContent = r.e.station.nameJa;
+    const lvl = document.createElement("span");
+    lvl.className = "tide-cell num";
+    lvl.textContent = r.cm == null ? "—" : `${r.cm}cm`;
+    const tr = document.createElement("span");
+    tr.className = "tide-cell num";
+    tr.textContent = r.cm == null ? "" : r.trend > 1 ? "↑" : r.trend < -1 ? "↓" : "→";
+    tr.style.color = r.trend > 1 ? "#2fa5a0" : r.trend < -1 ? "#d6a24e" : "var(--fg-dim)";
+    row.append(name, lvl, tr);
+    row.addEventListener("pointerenter", () => tide.highlight(r.i));
+    row.addEventListener("pointerleave", () => tide.highlight(-1));
+    row.addEventListener("click", () => selectTide(r.i));
+    tideTableEl.appendChild(row);
+    tideRowByEntry[r.i] = row;
+  }
+}
+
+let tideRowByEntry: (HTMLElement | undefined)[] = [];
+tide.onHighlight((index) => {
+  for (const row of tideRowByEntry) row?.classList.remove("hover");
+  if (index >= 0) tideRowByEntry[index]?.classList.add("hover");
+});
+
+/** ±90分窓で満潮・干潮の極値を探す */
+function tideExtrema(t: number[]): { i: number; kind: "high" | "low" }[] {
+  const out: { i: number; kind: "high" | "low" }[] = [];
+  const win = Math.round((90 / MINUTES) * t.length);
+  for (let i = 0; i < t.length; i++) {
+    const lo = Math.max(0, i - win), hi = Math.min(t.length - 1, i + win);
+    let isMax = true, isMin = true;
+    for (let j = lo; j <= hi; j++) { if (t[j] > t[i]) isMax = false; if (t[j] < t[i]) isMin = false; if (!isMax && !isMin) break; }
+    const last = out[out.length - 1];
+    if ((isMax || isMin) && (!last || i - last.i > win)) out.push({ i, kind: isMax ? "high" : "low" });
+  }
+  return out;
+}
+
+function selectTide(index: number): void {
+  tideSelected = index;
+  for (const row of tideRowByEntry) row?.classList.remove("hot");
+  tideRowByEntry[index]?.classList.add("hot");
+  drawTideCurve();
+}
+
+function drawTideCurve(): void {
+  const e = tideEntries[tideSelected];
+  const ctx = tideCurveEl.getContext("2d")!;
+  // 表示サイズ(CSS px)×DPR で描画バッファを合わせ、座標系はCSS pxに揃える（HiDPIでもぼやけない）
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const W = tideCurveEl.clientWidth || 300;
+  const H = tideCurveEl.clientHeight || 120;
+  const bw = Math.round(W * dpr), bh = Math.round(H * dpr);
+  if (tideCurveEl.width !== bw || tideCurveEl.height !== bh) { tideCurveEl.width = bw; tideCurveEl.height = bh; }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  if (!e || !e.day) { tideNameEl.textContent = "検潮所を選択"; tideHiloEl.textContent = ""; return; }
+  const d = e.day;
+  tideNameEl.textContent = `${e.station.nameJa}　${e.station.nameEn}`;
+  const pad = 6;
+  const X = (min: number) => pad + (min / (MINUTES - 1)) * (W - pad * 2);
+  const Y = (cm: number) => H - pad - ((cm - d.min) / (d.max - d.min || 1)) * (H - pad * 2);
+  // グリッド（低コントラスト）
+  ctx.strokeStyle = "rgba(60,110,105,0.18)";
+  ctx.lineWidth = 1;
+  for (let hh = 0; hh <= 24; hh += 6) { const x = X((hh / 24) * (MINUTES - 1)); ctx.beginPath(); ctx.moveTo(x, pad); ctx.lineTo(x, H - pad); ctx.stroke(); }
+  // 潮位曲線
+  ctx.strokeStyle = "#2fa5a0";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  const step = Math.max(1, Math.floor(d.tide.length / (W * 2)));
+  for (let i = 0; i < d.tide.length; i += step) {
+    const px = X((i / d.tide.length) * MINUTES), py = Y(d.tide[i]);
+    i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+  // 現在時刻マーカー
+  const min = jstMinute();
+  const cx = X(min), cy = Y(tideAt(d, min));
+  ctx.fillStyle = "#0e4a49";
+  ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill();
+  // 満干潮ラベル
+  const ex = tideExtrema(d.tide).map((x) => {
+    const m = (x.i / d.tide.length) * MINUTES;
+    return `${x.kind === "high" ? "満" : "干"} ${fmtMinute(m)} ${d.tide[x.i]}cm`;
+  });
+  tideHiloEl.textContent = `現在 ${tideAt(d, min)}cm　${ex.join("　")}`;
+}
+
+// 監視盤として毎分「現在潮位」を更新（棒の高さ・一覧・曲線マーカー）
+let lastTideMinute = jstMinute();
+setInterval(() => {
+  if (!tide.isVisible() || !tideEntries.length) return;
+  const m = jstMinute();
+  if (m === lastTideMinute) return;
+  lastTideMinute = m;
+  tide.refresh(m);
+  buildTideTable();
+  if (tideSelected >= 0) drawTideCurve();
+}, 5000);
+
 areaSelect.addEventListener("change", () => {
   const a = areasList.find((x) => x.code === areaSelect.value);
   if (a) void selectArea(a);
@@ -386,6 +631,18 @@ chartEl.addEventListener("pointermove", (ev) => {
     chartEl.style.cursor = "pointer";
     return;
   }
+  // 検潮所ピン（警報の次に優先）
+  if (tide.isVisible()) {
+    const ti = tide.pickAt(ev.clientX, ev.clientY);
+    tide.highlight(ti);
+    if (ti >= 0) {
+      const e = tide.entryAt(ti);
+      const cm = e?.day ? tideAt(e.day, jstMinute()) : null;
+      showTip(ev.clientX, ev.clientY, e ? `${e.station.nameJa}${cm != null ? `　${cm} cm` : ""}` : "");
+      chartEl.style.cursor = "pointer";
+      return;
+    }
+  }
   let tip = "";
   if (ll) {
     if (currents.isVisible()) {
@@ -402,12 +659,17 @@ chartEl.addEventListener("pointermove", (ev) => {
 });
 chartEl.addEventListener("pointerleave", () => {
   warnings.highlight(-1);
+  tide.highlight(-1);
   hideTip();
   coordEl.textContent = "緯経 —";
 });
 chartEl.addEventListener("click", (ev) => {
   const idx = warnings.pickAt(ev.clientX, ev.clientY);
-  if (idx >= 0) openInspector(warnings.visibleWarnings()[idx]);
+  if (idx >= 0) { openInspector(warnings.visibleWarnings()[idx]); return; }
+  if (tide.isVisible()) {
+    const ti = tide.pickAt(ev.clientX, ev.clientY);
+    if (ti >= 0) { updateRightTabs("tide"); selectTide(ti); }
+  }
 });
 
 // ---- 警報ティッカー ------------------------------------------------------
