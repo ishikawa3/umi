@@ -3,24 +3,25 @@
    水彩のにじみ／ソフトシャドウ／空→海のグラデーションで painterly に。 */
 
 :root {
-  --bg: #e9f0ee;
-  --bg-2: #dfeae8;
-  --panel: #f4f8f7;
-  --panel-2: #eef4f2;
-  --fg: #2c3f40;
-  --fg-dim: #6a7e7e;
-  --line: rgba(60, 110, 105, 0.16);
-  --ok: #2fa5a0;
-  --warn: #d6a24e;
-  --alert: #d9705f;
-  --lav: #c9cbe0;
+  /* ダーク管制センター（VTS/レーダー風）。暗い海に明るいデータを浮かせる高コントラスト */
+  --bg: #0a1826;
+  --bg-2: #07111c;
+  --panel: #0c1826;
+  --panel-2: #11202f;
+  --fg: #e4eef6;
+  --fg-dim: #8aa0b4;
+  --line: rgba(110, 150, 180, 0.20);
+  --ok: #5ee0d8;
+  --warn: #f0b64e;
+  --alert: #ff6b5e;
+  --lav: #b9c0e0;
 
   --sans: ui-sans-serif, "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
   --mono: ui-monospace, "SF Mono", "Roboto Mono", "Menlo", monospace;
   --script: "Segoe Script", "Bradley Hand", "Comic Sans MS", cursive;
 
   --radius: 8px;
-  --shadow: 0 2px 14px rgba(60, 110, 105, 0.1);
+  --shadow: 0 2px 16px rgba(0, 0, 0, 0.45);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -32,8 +33,8 @@ body {
   color: var(--fg);
   /* 空(上・淡)→海(下・ティール) の painterly グラデーション */
   background:
-    radial-gradient(120% 90% at 70% -10%, #f3f7f5 0%, rgba(243, 247, 245, 0) 55%),
-    linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 55%, #d3e3df 100%);
+    radial-gradient(120% 90% at 70% -12%, #12314a 0%, rgba(18, 49, 74, 0) 55%),
+    linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 55%, #050d16 100%);
   display: grid;
   grid-template-rows: auto 1fr auto;
   overflow: hidden;
@@ -78,11 +79,11 @@ body {
 .conn .led {
   width: 9px; height: 9px; border-radius: 50%;
   background: var(--warn);
-  box-shadow: 0 0 0 3px rgba(214, 162, 78, 0.18);
+  box-shadow: 0 0 0 3px rgba(240, 182, 78, 0.22);
 }
-.conn .led[data-state="ok"] { background: var(--ok); box-shadow: 0 0 0 3px rgba(47, 165, 160, 0.18); }
-.conn .led[data-state="down"] { background: var(--alert); box-shadow: 0 0 0 3px rgba(217, 112, 95, 0.18); }
-.conn .led[data-state="checking"] { background: var(--warn); box-shadow: 0 0 0 3px rgba(214, 162, 78, 0.18); }
+.conn .led[data-state="ok"] { background: var(--ok); box-shadow: 0 0 8px rgba(94, 224, 216, 0.5), 0 0 0 3px rgba(94, 224, 216, 0.22); }
+.conn .led[data-state="down"] { background: var(--alert); box-shadow: 0 0 8px rgba(255, 107, 94, 0.5), 0 0 0 3px rgba(255, 107, 94, 0.22); }
+.conn .led[data-state="checking"] { background: var(--warn); box-shadow: 0 0 0 3px rgba(240, 182, 78, 0.22); }
 .conn .txt { font-size: 0.72rem; color: var(--fg-dim); letter-spacing: 0.04em; }
 
 /* ---- 本体 3カラム ---- */
@@ -193,7 +194,7 @@ body {
   font-family: var(--mono);
   font-size: 0.72rem;
   color: var(--fg);
-  background: rgba(244, 248, 247, 0.92);
+  background: rgba(10, 22, 36, 0.94);
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 0.2rem 0.45rem;
@@ -292,7 +293,7 @@ body {
 }
 .tide-row:first-child { border-top: none; }
 .tide-row.tide-head { position: sticky; top: 0; background: var(--panel); z-index: 1; }
-.tide-row:not(.tide-head):hover, .tide-row.hover, .tide-row.hot { background: rgba(47, 165, 160, 0.1); }
+.tide-row:not(.tide-head):hover, .tide-row.hover, .tide-row.hot { background: rgba(94, 224, 216, 0.14); }
 .tide-cell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tide-cell.num { font-family: var(--mono); text-align: right; }
 .tide-cell.th {
@@ -368,7 +369,7 @@ body {
   cursor: pointer;
 }
 .warn-row:first-child { border-top: none; }
-.warn-row:hover, .warn-row.hot { background: rgba(47, 165, 160, 0.1); }
+.warn-row:hover, .warn-row.hot { background: rgba(94, 224, 216, 0.14); }
 .warn-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; }
 .warn-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -451,7 +452,7 @@ body {
   text-align: right;
   pointer-events: auto;
   /* 3D海図の上でも読めるよう、やわらかい下地（にじみ） */
-  background: rgba(244, 248, 247, 0.72);
+  background: rgba(8, 16, 26, 0.7);
   backdrop-filter: blur(3px);
   padding: 0.4rem 0.6rem;
   border-radius: var(--radius);

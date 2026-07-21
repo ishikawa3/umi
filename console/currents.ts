@@ -13,8 +13,8 @@ import { softDisc } from "./sprite";
 const CUR_R = 1.008;
 // 流速(kt)→1秒あたりの移流量(度)。物理厳密ではなく視認性のための倍率（向きは正しい）
 const FLOW_SCALE = 0.06;
-const SLOW = new THREE.Color("#a7d8d2"); // 遅い（淡ティール）
-const FAST = new THREE.Color("#ffffff"); // 速い（白）
+const SLOW = new THREE.Color("#2f7d84"); // 遅い（暗いシアン）
+const FAST = new THREE.Color("#eafffd"); // 速い（明るいシアン白）
 
 export interface CurrentReadout {
   kt: number;

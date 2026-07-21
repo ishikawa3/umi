@@ -8,12 +8,12 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { latLonToVec3, vec3ToLatLon, EARTH_RADIUS } from "./geo";
 import { COASTLINE } from "./coastline";
 
-// 0.6 の配色トークン（3D側でも同じ値を使う）
-const SEA = new THREE.Color("#2fa5a0"); // 基調ティール（海）
-const SKY_LIGHT = new THREE.Color("#eef4f2"); // 空の淡色（半球光の上）
-const HAZE = new THREE.Color("#bfe0dc"); // 霞のパステル
-const GRATICULE = new THREE.Color("#3c6e69"); // 経緯線（低コントラスト）
-const COAST = new THREE.Color("#0e4a49"); // 海岸線（海より濃いティールで陸を縁取る）
+// 配色トークン（ダーク管制センター）。暗い海に明るいデータを浮かせる
+const SEA = new THREE.Color("#0f2c44"); // 深い藍墨の海（暗いほどデータが映える）
+const SKY_LIGHT = new THREE.Color("#2b4d66"); // 半球光の上（薄明の空）
+const HAZE = new THREE.Color("#3d7d92"); // 大気の縁光（シアン寄り）
+const GRATICULE = new THREE.Color("#33607a"); // 経緯線（低コントラスト）
+const COAST = new THREE.Color("#5a8aa4"); // 海岸線（明るいシアングレーで陸をくっきり縁取る）
 
 /** 日本近海に初期カメラを寄せるための代表点 */
 const JAPAN_LAT = 37;
@@ -90,7 +90,7 @@ export class Globe {
       }
     }
     const geo = new THREE.BufferGeometry().setFromPoints(pts);
-    const mat = new THREE.LineBasicMaterial({ color: COAST, transparent: true, opacity: 0.7 });
+    const mat = new THREE.LineBasicMaterial({ color: COAST, transparent: true, opacity: 0.85 });
     return new THREE.LineSegments(geo, mat);
   }
 
