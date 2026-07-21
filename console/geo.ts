@@ -1,9 +1,11 @@
 // かいしょう — 3D海図の座標変換ユーティリティ
 //
 // 海しるは経度・緯度（EPSG:4326）で返る。地球儀（PLAN4 0.4 A案）に載せるため、
-// 緯度経度を半径 R の球面座標 Vector3 に写す。式は PLAN4 記載の
-//   (cosφ·cosλ, sinφ, cosφ·sinλ)
-// に一致（φ=緯度, λ=経度, いずれもラジアン）。
+// 緯度経度を半径 R の球面座標 Vector3 に写す。
+//   x = cosφ·cosλ, y = sinφ, z = −cosφ·sinλ
+// z を負にするのは、このカメラ設定（外から見下ろす・北が上）で東経が大きいほど
+// 画面右に来るようにするため（正のままだと東西が鏡像反転して見える）。
+// φ=緯度・λ=経度で、いずれも degToRad 変換後のラジアン。
 
 import * as THREE from "three";
 
@@ -17,16 +19,16 @@ export function latLonToVec3(lat: number, lon: number, radius = EARTH_RADIUS): T
   return new THREE.Vector3(
     radius * cosPhi * Math.cos(lambda),
     radius * Math.sin(phi),
-    radius * cosPhi * Math.sin(lambda)
+    -radius * cosPhi * Math.sin(lambda)
   );
 }
 
-/** 球面上の Vector3 → 緯度経度[度] */
+/** 球面上の Vector3 → 緯度経度[度]（latLonToVec3 の逆） */
 export function vec3ToLatLon(v: THREE.Vector3): { lat: number; lon: number } {
   const r = v.length() || 1;
   return {
     lat: THREE.MathUtils.radToDeg(Math.asin(THREE.MathUtils.clamp(v.y / r, -1, 1))),
-    lon: THREE.MathUtils.radToDeg(Math.atan2(v.z, v.x)),
+    lon: THREE.MathUtils.radToDeg(Math.atan2(-v.z, v.x)),
   };
 }
 
