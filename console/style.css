@@ -1,0 +1,213 @@
+/* かいしょう / KAISHŌ VTS Console — ライト・パステルの「穏やかな運用コンソール」
+   トークンと意匠は PLAN4 0.6 に準拠。硬い罫線・強い影・ネオンは避け、
+   水彩のにじみ／ソフトシャドウ／空→海のグラデーションで painterly に。 */
+
+:root {
+  --bg: #e9f0ee;
+  --bg-2: #dfeae8;
+  --panel: #f4f8f7;
+  --panel-2: #eef4f2;
+  --fg: #2c3f40;
+  --fg-dim: #6a7e7e;
+  --line: rgba(60, 110, 105, 0.16);
+  --ok: #2fa5a0;
+  --warn: #d6a24e;
+  --alert: #d9705f;
+  --lav: #c9cbe0;
+
+  --sans: ui-sans-serif, "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", "Roboto Mono", "Menlo", monospace;
+  --script: "Segoe Script", "Bradley Hand", "Comic Sans MS", cursive;
+
+  --radius: 8px;
+  --shadow: 0 2px 14px rgba(60, 110, 105, 0.1);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  font-family: var(--sans);
+  color: var(--fg);
+  /* 空(上・淡)→海(下・ティール) の painterly グラデーション */
+  background:
+    radial-gradient(120% 90% at 70% -10%, #f3f7f5 0%, rgba(243, 247, 245, 0) 55%),
+    linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 55%, #d3e3df 100%);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- ヘッダ ---- */
+.hdr {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  padding: 0.6rem 1.2rem;
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(2px);
+}
+.brand { display: flex; align-items: baseline; gap: 0.6rem; }
+.brand .mark {
+  font-family: var(--script);
+  font-size: 1.5rem;
+  color: var(--ok);
+  line-height: 1;
+}
+.brand .sub {
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  color: var(--fg-dim);
+  text-transform: uppercase;
+}
+.hdr-spacer { flex: 1; }
+.hdr .clock {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  color: var(--fg);
+  letter-spacing: 0.04em;
+}
+.hdr .duty {
+  font-size: 0.72rem;
+  color: var(--fg-dim);
+  letter-spacing: 0.06em;
+}
+.conn { display: flex; align-items: center; gap: 0.4rem; }
+.conn .led {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--warn);
+  box-shadow: 0 0 0 3px rgba(214, 162, 78, 0.18);
+}
+.conn .led[data-state="ok"] { background: var(--ok); box-shadow: 0 0 0 3px rgba(47, 165, 160, 0.18); }
+.conn .led[data-state="down"] { background: var(--alert); box-shadow: 0 0 0 3px rgba(217, 112, 95, 0.18); }
+.conn .led[data-state="checking"] { background: var(--warn); box-shadow: 0 0 0 3px rgba(214, 162, 78, 0.18); }
+.conn .txt { font-size: 0.72rem; color: var(--fg-dim); letter-spacing: 0.04em; }
+
+/* ---- 本体 3カラム ---- */
+.body {
+  display: grid;
+  grid-template-columns: 240px 1fr 320px;
+  min-height: 0;
+}
+.panel {
+  background: var(--panel);
+  overflow: auto;
+}
+.panel.left { border-right: 1px solid var(--line); }
+.panel.right { border-left: 1px solid var(--line); }
+.panel h2 {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--fg-dim);
+  text-transform: uppercase;
+  padding: 0.9rem 1rem 0.5rem;
+}
+
+/* レイヤ一覧 */
+.layer-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.86rem;
+  border-top: 1px solid var(--line);
+  cursor: default;
+}
+.layer-row input { accent-color: var(--ok); }
+.layer-name { flex: 1; }
+.layer-tag {
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  color: var(--fg-dim);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.05rem 0.3rem;
+}
+
+/* 海図（3D） */
+.chart {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+.chart canvas { display: block; }
+.chart .overlay-title {
+  position: absolute;
+  top: 1rem;
+  left: 1.1rem;
+  pointer-events: none;
+  color: var(--fg);
+}
+.chart .overlay-title .t { font-size: 1.1rem; letter-spacing: 0.16em; }
+.chart .overlay-title .s {
+  font-size: 0.7rem;
+  color: var(--fg-dim);
+  letter-spacing: 0.1em;
+  margin-top: 0.2rem;
+}
+
+/* インスペクタ */
+.inspector-body {
+  padding: 0.4rem 1rem 1rem;
+  font-size: 0.82rem;
+  line-height: 1.7;
+  color: var(--fg-dim);
+}
+
+/* ---- ステータスバー ---- */
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: 1.4rem;
+  padding: 0.4rem 1.2rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.74rem;
+  color: var(--fg-dim);
+  background: var(--panel-2);
+}
+.statusbar .mono { font-family: var(--mono); color: var(--fg); }
+.statusbar .ticker {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--fg-dim);
+  border-left: 1px solid var(--line);
+  padding-left: 1.2rem;
+}
+
+/* ---- クレジット（法的義務・常時表示） ---- */
+.credit {
+  position: fixed;
+  right: 332px;
+  bottom: 2.4rem;
+  max-width: 42ch;
+  font-size: 0.64rem;
+  line-height: 1.5;
+  color: var(--fg-dim);
+  text-align: right;
+  pointer-events: auto;
+  /* 3D海図の上でも読めるよう、やわらかい下地（にじみ） */
+  background: rgba(244, 248, 247, 0.72);
+  backdrop-filter: blur(3px);
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius);
+}
+.credit a { color: var(--ok); text-decoration: none; }
+.credit a:hover { text-decoration: underline; }
+
+/* ---- レスポンシブ（最低限崩れない） ---- */
+@media (max-width: 900px) {
+  .body { grid-template-columns: 200px 1fr; }
+  .panel.right { display: none; }
+  .credit { right: 1rem; }
+}
+@media (max-width: 640px) {
+  .body { grid-template-columns: 1fr; }
+  .panel.left { display: none; }
+  .hdr { gap: 0.7rem; flex-wrap: wrap; }
+  .hdr .clock { font-size: 0.72rem; }
+}

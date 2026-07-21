@@ -37,6 +37,8 @@ mainにpushするとGitHub Actionsで自動デプロイ。認証は `Ocp-Apim-Su
 継続運用時は[利用方法](https://portal.msil.go.jp/howtouse)から個別キーを申請して差し替える。
 
 拡張の設計は `docs/PLAN.md`（第1期・完了）と `docs/PLAN2.md`（第2期）に。
+同じ海しるデータを three.js/WebGL の業務システム風コンソールで見せる別サイトの構想は
+`docs/PLAN4.md`（第4期・かいしょう / VTS Console）に。
 
 ## 注意
 
