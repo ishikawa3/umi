@@ -101,6 +101,10 @@ export class WarningsLayer {
     this.group.visible = v;
   }
 
+  isVisible(): boolean {
+    return this.group.visible;
+  }
+
   onHighlight(cb: (index: number) => void): void {
     this.onHighlightCb = cb;
   }
