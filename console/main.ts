@@ -166,7 +166,7 @@ function updateRightTabs(prefer: RightTab | null): void {
     const btn = document.createElement("button");
     btn.className = "rp-tab" + (p.key === activeTab ? " active" : "");
     btn.textContent = p.label;
-    btn.setAttribute("role", "tab");
+    btn.setAttribute("aria-pressed", String(p.key === activeTab));
     btn.addEventListener("click", () => { activeTab = p.key; updateRightTabs(p.key); });
     rpTabs.appendChild(btn);
   }
@@ -508,7 +508,13 @@ function selectTide(index: number): void {
 function drawTideCurve(): void {
   const e = tideEntries[tideSelected];
   const ctx = tideCurveEl.getContext("2d")!;
-  const W = tideCurveEl.width, H = tideCurveEl.height;
+  // 表示サイズ(CSS px)×DPR で描画バッファを合わせ、座標系はCSS pxに揃える（HiDPIでもぼやけない）
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const W = tideCurveEl.clientWidth || 300;
+  const H = tideCurveEl.clientHeight || 120;
+  const bw = Math.round(W * dpr), bh = Math.round(H * dpr);
+  if (tideCurveEl.width !== bw || tideCurveEl.height !== bh) { tideCurveEl.width = bw; tideCurveEl.height = bh; }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, W, H);
   if (!e || !e.day) { tideNameEl.textContent = "検潮所を選択"; tideHiloEl.textContent = ""; return; }
   const d = e.day;
