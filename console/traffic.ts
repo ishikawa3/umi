@@ -113,7 +113,7 @@ export class TrafficLayer {
     this.points.geometry.setDrawRange(0, n);
     this.points.geometry.computeBoundingSphere();
     this.loaded = true;
-    return active.length;
+    return n; // 実際に描画した点数（間引き後）。0 なら無データ
   }
 
   /** ホバー地点の通航量クラス（ラベル）。無データなら null */
