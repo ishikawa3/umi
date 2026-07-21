@@ -1,19 +1,19 @@
 // かいしょう — three.js の 3D 海図（地球儀）
 //
-// PLAN4 0.4 A案・0.6 の painterly ライト意匠に沿う。硬い光沢やネオングローは避け、
-// 半球光によるやわらかい陰影＋淡い霞（atmospheric haze）で「にじむ光」を作る。
+// PLAN4 0.4 A案・0.6 のダーク管制センター意匠に沿う。深い藍墨の海に、
+// 半球光のやわらかい陰影＋大気の縁光（cyan の atmospheric haze）で球の存在感を出す。
 
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { latLonToVec3, vec3ToLatLon, EARTH_RADIUS } from "./geo";
 import { COASTLINE } from "./coastline";
 
-// 0.6 の配色トークン（3D側でも同じ値を使う）
-const SEA = new THREE.Color("#2fa5a0"); // 基調ティール（海）
-const SKY_LIGHT = new THREE.Color("#eef4f2"); // 空の淡色（半球光の上）
-const HAZE = new THREE.Color("#bfe0dc"); // 霞のパステル
-const GRATICULE = new THREE.Color("#3c6e69"); // 経緯線（低コントラスト）
-const COAST = new THREE.Color("#0e4a49"); // 海岸線（海より濃いティールで陸を縁取る）
+// 配色トークン（ダーク管制センター）。暗い海に明るいデータを浮かせる
+const SEA = new THREE.Color("#0f2c44"); // 深い藍墨の海（暗いほどデータが映える）
+const SKY_LIGHT = new THREE.Color("#2b4d66"); // 半球光の上（薄明の空）
+const HAZE = new THREE.Color("#3d7d92"); // 大気の縁光（シアン寄り）
+const GRATICULE = new THREE.Color("#33607a"); // 経緯線（低コントラスト）
+const COAST = new THREE.Color("#5a8aa4"); // 海岸線（明るいシアングレーで陸をくっきり縁取る）
 
 /** 日本近海に初期カメラを寄せるための代表点 */
 const JAPAN_LAT = 37;
@@ -51,7 +51,7 @@ export class Globe {
     this.controls.minDistance = 1.2;
     this.controls.maxDistance = 4.2;
 
-    // --- 光: 半球光でやわらかく（空=淡色, 地=海ティール）＋弱い方向光 ---
+    // --- 光: 半球光でやわらかく（空=薄明色, 地=海の藍墨）＋弱い方向光 ---
     const hemi = new THREE.HemisphereLight(SKY_LIGHT, SEA.clone().multiplyScalar(0.28), 0.85);
     this.scene.add(hemi);
     // やわらかい方向光で球にゆるい明暗（終端線）を作り、立体に見せる
@@ -59,7 +59,7 @@ export class Globe {
     key.position.set(-1.1, 0.9, 0.7);
     this.scene.add(key);
 
-    // --- 海（地球本体）: つや消しのティール球 ---
+    // --- 海（地球本体）: つや消しの藍墨の球 ---
     const oceanGeo = new THREE.SphereGeometry(EARTH_RADIUS, 96, 96);
     const oceanMat = new THREE.MeshStandardMaterial({
       color: SEA,
@@ -75,7 +75,7 @@ export class Globe {
     // --- 経緯線（30°ごと。低コントラストの細線） ---
     this.scene.add(this.buildGraticule());
 
-    // --- 霞（背側フレネルのパステル。ネオンにしない） ---
+    // --- 大気の縁光（背側フレネルの cyan haze。ネオンにしない） ---
     this.scene.add(this.buildHaze());
   }
 
@@ -90,7 +90,7 @@ export class Globe {
       }
     }
     const geo = new THREE.BufferGeometry().setFromPoints(pts);
-    const mat = new THREE.LineBasicMaterial({ color: COAST, transparent: true, opacity: 0.7 });
+    const mat = new THREE.LineBasicMaterial({ color: COAST, transparent: true, opacity: 0.85 });
     return new THREE.LineSegments(geo, mat);
   }
 

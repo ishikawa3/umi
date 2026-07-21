@@ -2,7 +2,7 @@
 //
 // うみ「ながれ」の粒子機構を球面へ。VectorField(src/field.ts)のIDWを lon/lat 空間で
 // そのまま使い、粒子を流向に沿って移流し、球面上の three.js Points として描く。
-// 色は流速の単一色相ランプ（淡→白＝速い。海のティール上でも視認できる明度差）。
+// 色は流速の単一色相ランプ（暗いシアン→白＝速い。暗い海の上でも視認できる明度差）。
 
 import * as THREE from "three";
 import type { Area } from "../src/api";
@@ -13,8 +13,8 @@ import { softDisc } from "./sprite";
 const CUR_R = 1.008;
 // 流速(kt)→1秒あたりの移流量(度)。物理厳密ではなく視認性のための倍率（向きは正しい）
 const FLOW_SCALE = 0.06;
-const SLOW = new THREE.Color("#a7d8d2"); // 遅い（淡ティール）
-const FAST = new THREE.Color("#ffffff"); // 速い（白）
+const SLOW = new THREE.Color("#2f7d84"); // 遅い（暗いシアン）
+const FAST = new THREE.Color("#eafffd"); // 速い（明るいシアン白）
 
 export interface CurrentReadout {
   kt: number;

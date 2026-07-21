@@ -187,12 +187,12 @@ function legendBar(label: string, cLow: string, cHigh: string, lo: string, hi: s
 }
 function updateLegend(): void {
   const parts: string[] = [];
-  if (currents.isVisible()) parts.push(legendBar("流速 kt", "#a7d8d2", "#ffffff", "0", currents.refSpeed().toFixed(1)));
+  if (currents.isVisible()) parts.push(legendBar("流速 kt", "#2f7d84", "#eafffd", "0", currents.refSpeed().toFixed(1)));
   if (waves.isVisible()) {
     const r = waves.range();
-    parts.push(legendBar("有義波高 m", "#3f9f9a", "#f4fbfa", r.lo.toFixed(1), r.hi.toFixed(1)));
+    parts.push(legendBar("有義波高 m", "#1f5a68", "#eafffb", r.lo.toFixed(1), r.hi.toFixed(1)));
   }
-  if (traffic.isVisible()) parts.push(legendBar("通航量（4クラス）", "#173f4d", "#f2fbfa", "閑散", "過密"));
+  if (traffic.isVisible()) parts.push(legendBar("通航量（4クラス）", "#1c5566", "#eafffd", "閑散", "過密"));
   legendSection.hidden = parts.length === 0;
   legendEl.innerHTML = parts.join("");
 }
@@ -482,7 +482,7 @@ function buildTideTable(): void {
     const tr = document.createElement("span");
     tr.className = "tide-cell num";
     tr.textContent = r.cm == null ? "" : r.trend > 1 ? "↑" : r.trend < -1 ? "↓" : "→";
-    tr.style.color = r.trend > 1 ? "#2fa5a0" : r.trend < -1 ? "#d6a24e" : "var(--fg-dim)";
+    tr.style.color = r.trend > 1 ? "#5ee0d8" : r.trend < -1 ? "#f0b64e" : "var(--fg-dim)";
     row.append(name, lvl, tr);
     row.addEventListener("pointerenter", () => tide.highlight(r.i));
     row.addEventListener("pointerleave", () => tide.highlight(-1));
@@ -537,11 +537,11 @@ function drawTideCurve(): void {
   const X = (min: number) => pad + (min / (MINUTES - 1)) * (W - pad * 2);
   const Y = (cm: number) => H - pad - ((cm - d.min) / (d.max - d.min || 1)) * (H - pad * 2);
   // グリッド（低コントラスト）
-  ctx.strokeStyle = "rgba(60,110,105,0.18)";
+  ctx.strokeStyle = "rgba(110,150,180,0.18)";
   ctx.lineWidth = 1;
   for (let hh = 0; hh <= 24; hh += 6) { const x = X((hh / 24) * (MINUTES - 1)); ctx.beginPath(); ctx.moveTo(x, pad); ctx.lineTo(x, H - pad); ctx.stroke(); }
   // 潮位曲線
-  ctx.strokeStyle = "#2fa5a0";
+  ctx.strokeStyle = "#5ee0d8";
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   const step = Math.max(1, Math.floor(d.tide.length / (W * 2)));
@@ -553,7 +553,7 @@ function drawTideCurve(): void {
   // 現在時刻マーカー
   const min = jstMinute();
   const cx = X(min), cy = Y(tideAt(d, min));
-  ctx.fillStyle = "#0e4a49";
+  ctx.fillStyle = "#eafffd";
   ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill();
   // 満干潮ラベル
   const ex = tideExtrema(d.tide).map((x) => {

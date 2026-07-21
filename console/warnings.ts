@@ -1,8 +1,8 @@
 // かいしょう — 航行警報レイヤ（フェーズ15）
 //
 // 海しる navigational-warnings/v2 を、地球儀上の点として描く運用レイヤ。
-// うみ「こえ」の陰画。色は PLAN4 0.6 の機能色3色（正常ティール／注意アンバー／
-// 危険テラコッタ）に、こえの種別を写像する。危険系はやわらかく明滅。
+// うみ「こえ」の陰画。色は PLAN4 0.6 の機能色3色（正常シアン／注意アンバー／
+// 危険レッド）に、こえの種別を写像する。危険系はやわらかく明滅。
 
 import * as THREE from "three";
 import type { NavWarning } from "../src/api";
@@ -16,13 +16,13 @@ export interface WarningCategory {
   danger?: boolean; // 明滅させる危険種別
 }
 
-// こえの5種別を 0.6 の3色（ティール/アンバー/テラコッタ）へ写像
+// こえの5種別を機能色3色（危険レッド/注意アンバー/正常シアン）へ写像（ダーク地で高輝度）
 export const CATEGORIES: WarningCategory[] = [
-  { key: "wreck", label: "沈没・座礁", color: "#d9705f", danger: true },
-  { key: "work", label: "工事・作業", color: "#d6a24e" },
-  { key: "exercise", label: "演習・訓練", color: "#d6a24e" },
-  { key: "light", label: "灯台・標識", color: "#2fa5a0" },
-  { key: "other", label: "その他", color: "#2fa5a0" },
+  { key: "wreck", label: "沈没・座礁", color: "#ff6b5e", danger: true },
+  { key: "work", label: "工事・作業", color: "#f0b64e" },
+  { key: "exercise", label: "演習・訓練", color: "#f0b64e" },
+  { key: "light", label: "灯台・標識", color: "#5ee0d8" },
+  { key: "other", label: "その他", color: "#5ee0d8" },
 ];
 const CAT_BY_KEY = new Map(CATEGORIES.map((c) => [c.key, c]));
 

@@ -25,8 +25,8 @@ const CLASS_COLORS: { rgb: [number, number, number]; cls: number }[] = [
   { rgb: [214, 47, 39], cls: 4 }, // 赤 = 過密
 ];
 export const CLASS_LABEL = ["閑散", "中", "多い", "過密"];
-// 単一色相ランプ（暗群青＝閑散 → 白＝過密）。0.6 の量表現に沿う
-const RAMP = ["#173f4d", "#2f7d84", "#8ecac6", "#f2fbfa"].map((h) => new THREE.Color(h));
+// 単一色相ランプ（暗いシアン＝閑散 → 明るいシアン白＝過密）
+const RAMP = ["#1c5566", "#2f8a94", "#7fd8d2", "#eafffd"].map((h) => new THREE.Color(h));
 
 function classify(r: number, g: number, b: number): number {
   if (r > 235 && g > 235 && b > 235) return 0; // 白背景＝無データ

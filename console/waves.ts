@@ -1,7 +1,7 @@
 // かいしょう — 波浪レイヤ（フェーズ16）
 //
 // 有義波高（wave-analysis/v2）を球面の点描ヒートマップに。うみ「なみ」の陰画。
-// 高波域を白い泡のように明るく（淡ティール→白の単一色相ランプ）。静的描画。
+// 高波域を白い泡のように明るく（暗いシアン→明るい白の単一色相ランプ）。静的描画。
 
 import * as THREE from "three";
 import type { WaveSample } from "../src/api";
@@ -9,8 +9,8 @@ import { latLonToVec3 } from "./geo";
 import { softDisc } from "./sprite";
 
 const WAVE_R = 1.007;
-const LOW = new THREE.Color("#3f9f9a"); // 穏やか（海に近い）
-const HIGH = new THREE.Color("#f4fbfa"); // 高波（白い泡）
+const LOW = new THREE.Color("#1f5a68"); // 穏やか（暗い海に近い）
+const HIGH = new THREE.Color("#eafffb"); // 高波（明るい白い泡）
 
 export interface WaveReadout {
   height: number;

@@ -10,8 +10,8 @@ import type { Globe } from "./scene";
 
 const BASE_R = 1.006;
 const BAR = 0.07; // 正規化潮位1.0のときの棒の高さ（半径比）
-const LOW = new THREE.Color("#2b6f6a"); // 低潮位（海に近いティール）
-const HIGH = new THREE.Color("#ffffff"); // 高潮位（白）
+const LOW = new THREE.Color("#2c6b74"); // 低潮位（暗いシアン）
+const HIGH = new THREE.Color("#eafffd"); // 高潮位（明るいシアン白）
 
 export interface TideEntry {
   station: TideStation;
@@ -56,7 +56,7 @@ export class TideLayer {
     const stemGeo = new THREE.BufferGeometry();
     stemGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(capacity * 2 * 3), 3));
     stemGeo.setDrawRange(0, 0);
-    const stemMat = new THREE.LineBasicMaterial({ color: new THREE.Color("#7fd3cb"), transparent: true, opacity: 0.65 });
+    const stemMat = new THREE.LineBasicMaterial({ color: new THREE.Color("#5ee0d8"), transparent: true, opacity: 0.6 });
     this.stems = new THREE.LineSegments(stemGeo, stemMat);
     this.stems.frustumCulled = false;
 
