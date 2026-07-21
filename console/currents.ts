@@ -2,7 +2,7 @@
 //
 // うみ「ながれ」の粒子機構を球面へ。VectorField(src/field.ts)のIDWを lon/lat 空間で
 // そのまま使い、粒子を流向に沿って移流し、球面上の three.js Points として描く。
-// 色は流速の単一色相ランプ（淡→白＝速い。海のティール上でも視認できる明度差）。
+// 色は流速の単一色相ランプ（暗いシアン→白＝速い。暗い海の上でも視認できる明度差）。
 
 import * as THREE from "three";
 import type { Area } from "../src/api";

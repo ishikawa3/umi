@@ -1,7 +1,7 @@
 // かいしょう — three.js の 3D 海図（地球儀）
 //
-// PLAN4 0.4 A案・0.6 の painterly ライト意匠に沿う。硬い光沢やネオングローは避け、
-// 半球光によるやわらかい陰影＋淡い霞（atmospheric haze）で「にじむ光」を作る。
+// PLAN4 0.4 A案・0.6 のダーク管制センター意匠に沿う。深い藍墨の海に、
+// 半球光のやわらかい陰影＋大気の縁光（cyan の atmospheric haze）で球の存在感を出す。
 
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -51,7 +51,7 @@ export class Globe {
     this.controls.minDistance = 1.2;
     this.controls.maxDistance = 4.2;
 
-    // --- 光: 半球光でやわらかく（空=淡色, 地=海ティール）＋弱い方向光 ---
+    // --- 光: 半球光でやわらかく（空=薄明色, 地=海の藍墨）＋弱い方向光 ---
     const hemi = new THREE.HemisphereLight(SKY_LIGHT, SEA.clone().multiplyScalar(0.28), 0.85);
     this.scene.add(hemi);
     // やわらかい方向光で球にゆるい明暗（終端線）を作り、立体に見せる
@@ -59,7 +59,7 @@ export class Globe {
     key.position.set(-1.1, 0.9, 0.7);
     this.scene.add(key);
 
-    // --- 海（地球本体）: つや消しのティール球 ---
+    // --- 海（地球本体）: つや消しの藍墨の球 ---
     const oceanGeo = new THREE.SphereGeometry(EARTH_RADIUS, 96, 96);
     const oceanMat = new THREE.MeshStandardMaterial({
       color: SEA,
@@ -75,7 +75,7 @@ export class Globe {
     // --- 経緯線（30°ごと。低コントラストの細線） ---
     this.scene.add(this.buildGraticule());
 
-    // --- 霞（背側フレネルのパステル。ネオンにしない） ---
+    // --- 大気の縁光（背側フレネルの cyan haze。ネオンにしない） ---
     this.scene.add(this.buildHaze());
   }
 
