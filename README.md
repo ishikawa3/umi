@@ -15,6 +15,10 @@
 | [こおり](https://ishikawa3.github.io/umi/koori.html) | オホーツク海・北海道沖の海氷を白で。オフシーズンは「凍っていない」ことを静かに語る | 海氷 v2 |
 | [すじ](https://ishikawa3.github.io/umi/suji.html) | 日本近海の海底ケーブル経路を、微光が流れる海の神経として | 海底ケーブル v2 |
 
+同じ海しるデータを、この詩的な作品群とは真逆の「業務システム風」に見せる別サイト
+[**かいしょう / VTS Console**](https://ishikawa3.github.io/umi/console/)（three.js/WebGL の3D海図）もあります。
+設計は `docs/PLAN4.md`。
+
 共通の道具立て:
 
 - `src/api.ts` — 海しるAPIクライアント（429リトライ・v2 ArcGIS形式の汎用クエリ）

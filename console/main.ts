@@ -18,6 +18,7 @@ import { WarningsLayer, CATEGORIES, toConsoleWarnings, type ConsoleWarning } fro
 import { WavesLayer } from "./waves";
 import { CurrentsLayer, compass8 } from "./currents";
 import { TideLayer, tideAt, tideNorm, type TideEntry } from "./tide";
+import { TrafficLayer } from "./traffic";
 
 const JAPAN_BBOX: [number, number, number, number] = [122, 24, 148, 46];
 
@@ -60,6 +61,7 @@ const warnings = new WarningsLayer(globe);
 const waves = new WavesLayer(globe);
 const currents = new CurrentsLayer(globe);
 const tide = new TideLayer(globe);
+const traffic = new TrafficLayer(globe);
 
 // ---- 時間軸（潮流用。config を流用） ------------------------------------
 const STEP_MS = TIME_STEP_MIN * 60_000;
@@ -121,7 +123,8 @@ const LAYERS: LayerDef[] = [
     onToggle: (v) => { waves.setVisible(v); updateLegend(); if (v) void ensureWaves(); } },
   { key: "tide", label: "検潮所", phase: "P17", live: true,
     onToggle: (v) => { tide.setVisible(v); updateRightTabs(v ? "tide" : null); if (v) void ensureTide(); } },
-  { key: "traffic", label: "通航量", phase: "P18" },
+  { key: "traffic", label: "通航量", phase: "P18", live: true,
+    onToggle: (v) => { traffic.setVisible(v); updateLegend(); if (v) void ensureTraffic(); } },
 ];
 function buildLayerPanel(): void {
   const list = $("layer-list");
@@ -189,6 +192,7 @@ function updateLegend(): void {
     const r = waves.range();
     parts.push(legendBar("有義波高 m", "#3f9f9a", "#f4fbfa", r.lo.toFixed(1), r.hi.toFixed(1)));
   }
+  if (traffic.isVisible()) parts.push(legendBar("通航量（4クラス）", "#173f4d", "#f2fbfa", "閑散", "過密"));
   legendSection.hidden = parts.length === 0;
   legendEl.innerHTML = parts.join("");
 }
@@ -355,7 +359,17 @@ async function ensureWaves(): Promise<void> {
   try {
     waves.setData(await fetchWaves(JAPAN_BBOX));
     updateLegend();
-  } catch { wavesInit = false; }
+  } catch { wavesInit = false; showToast("波浪データを取得できませんでした"); }
+}
+let trafficInit = false;
+async function ensureTraffic(): Promise<void> {
+  if (trafficInit) return;
+  trafficInit = true;
+  try {
+    const count = await traffic.load();
+    updateLegend();
+    if (count === 0) showToast("通航量データがありません");
+  } catch { trafficInit = false; showToast("通航量データを取得できませんでした"); }
 }
 
 // ---- 検潮所（フェーズ17） -----------------------------------------------
@@ -612,6 +626,15 @@ function showTip(x: number, y: number, text: string): void {
 }
 function hideTip(): void { tooltip.classList.remove("visible"); }
 
+const toastEl = $("toast");
+let toastTimer = 0;
+function showToast(msg: string): void {
+  toastEl.textContent = msg;
+  toastEl.classList.add("visible");
+  clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => toastEl.classList.remove("visible"), 4000);
+}
+
 chartEl.addEventListener("pointermove", (ev) => {
   const idx = warnings.pickAt(ev.clientX, ev.clientY);
   warnings.highlight(idx);
@@ -652,6 +675,10 @@ chartEl.addEventListener("pointermove", (ev) => {
     if (!tip && waves.isVisible()) {
       const r = waves.readoutAt(ll.lat, ll.lon);
       if (r) tip = `有義波高 ${r.height.toFixed(2)} m`;
+    }
+    if (!tip && traffic.isVisible()) {
+      const r = traffic.readoutAt(ll.lat, ll.lon);
+      if (r) tip = `通航量 ${r}`;
     }
   }
   if (tip) { showTip(ev.clientX, ev.clientY, tip); chartEl.style.cursor = "crosshair"; }

@@ -202,6 +202,27 @@ body {
 }
 #tooltip.visible { opacity: 1; }
 
+/* トースト（データ取得失敗・無データの通知） */
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: 3.4rem;
+  transform: translateX(-50%) translateY(0.4rem);
+  z-index: 7;
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  color: var(--fg);
+  background: var(--panel);
+  border: 1px solid var(--alert);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.8rem;
+  box-shadow: var(--shadow);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+}
+#toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+
 /* 海図（3D） */
 .chart {
   position: relative;
