@@ -66,6 +66,7 @@ export class WarningsLayer {
 
   // 明滅対象（visible配列内のindex）と各インスタンスの基本色
   private baseColors: THREE.Color[] = [];
+  private readonly tmpColor = new THREE.Color(); // pulse で毎フレーム再利用（clone回避）
 
   constructor(globe: Globe, capacity = 2000) {
     this.globe = globe;
@@ -153,11 +154,14 @@ export class WarningsLayer {
   private pulse(tMs: number): void {
     if (!this.group.visible || this.mesh.count === 0 || !this.mesh.instanceColor) return;
     let touched = false;
-    for (let i = 0; i < this.visible.length; i++) {
+    // 描画中のインスタンス数（= baseColors.length）までに限定。visible が capacity を
+    // 超えても範囲外 index を触らない。Color は tmpColor を再利用して割り当てを避ける。
+    for (let i = 0; i < this.mesh.count; i++) {
       const w = this.visible[i];
       if (!w.category.danger) continue;
       const b = 0.7 + 0.3 * Math.sin(tMs / 900 + w.seed);
-      this.mesh.setColorAt(i, this.baseColors[i].clone().multiplyScalar(b));
+      this.tmpColor.copy(this.baseColors[i]).multiplyScalar(b);
+      this.mesh.setColorAt(i, this.tmpColor);
       touched = true;
     }
     if (touched) this.mesh.instanceColor.needsUpdate = true;
