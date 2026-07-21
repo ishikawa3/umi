@@ -246,6 +246,27 @@ body {
   margin-top: 0.2rem;
 }
 
+/* クラスタ件数バブル（密集地点。ズームで分離すると消える） */
+.cluster-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+.cluster-bubble {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  min-width: 1.5em;
+  height: 1.5em;
+  padding: 0 0.35em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #08131f;
+  background: var(--ok);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 999px;
+  box-shadow: 0 0 10px rgba(94, 224, 216, 0.55);
+}
+
 /* 右パネルのタブ */
 .rp-tabs {
   display: flex;

@@ -19,6 +19,7 @@ import { WavesLayer } from "./waves";
 import { CurrentsLayer, compass8 } from "./currents";
 import { TideLayer, tideAt, tideNorm, type TideEntry } from "./tide";
 import { TrafficLayer } from "./traffic";
+import { latLonToVec3, projectToScreen, isFacingCamera } from "./geo";
 
 const JAPAN_BBOX: [number, number, number, number] = [122, 24, 148, 46];
 
@@ -62,6 +63,54 @@ const waves = new WavesLayer(globe);
 const currents = new CurrentsLayer(globe);
 const tide = new TideLayer(globe);
 const traffic = new TrafficLayer(globe);
+
+// ---- クラスタ表示（ズームで密集地点の件数バブルが出る） ------------------
+const clusterEl = document.createElement("div");
+clusterEl.className = "cluster-overlay";
+chartEl.appendChild(clusterEl);
+const CLUSTER_PX = 30; // この画面距離内のマーカーを1グループに束ねる
+
+/** いま地図に出ているマーカーの世界座標と色を集める */
+function currentMarkers(): { v: ReturnType<typeof latLonToVec3>; color: string }[] {
+  const out: { v: ReturnType<typeof latLonToVec3>; color: string }[] = [];
+  if (warnings.isVisible()) for (const w of warnings.visibleWarnings()) out.push({ v: latLonToVec3(w.lat, w.lon, 1.02), color: w.category.color });
+  if (tide.isVisible()) for (const e of tideEntries) out.push({ v: latLonToVec3(e.station.lat, e.station.lon, 1.02), color: "#5ee0d8" });
+  return out;
+}
+/** マーカーを画面上で束ね、2件以上のかたまりに件数バブルを出す */
+function renderClusters(): void {
+  const rect = globe.renderer.domElement.getBoundingClientRect();
+  const W = rect.width, H = rect.height;
+  const pts: { x: number; y: number; color: string }[] = [];
+  for (const m of currentMarkers()) {
+    if (!isFacingCamera(m.v, globe.camera)) continue; // 地球の裏側は除外
+    const s = projectToScreen(m.v, globe.camera, W, H);
+    if (s) pts.push({ x: s.x, y: s.y, color: m.color });
+  }
+  const used = new Array(pts.length).fill(false);
+  clusterEl.textContent = "";
+  for (let i = 0; i < pts.length; i++) {
+    if (used[i]) continue;
+    let sx = pts[i].x, sy = pts[i].y, n = 1; used[i] = true;
+    for (let j = i + 1; j < pts.length; j++) {
+      if (used[j]) continue;
+      if (Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y) < CLUSTER_PX) { sx += pts[j].x; sy += pts[j].y; n++; used[j] = true; }
+    }
+    if (n < 2) continue; // 単独マーカーはそのまま（3Dピンが見える）
+    const bub = document.createElement("div");
+    bub.className = "cluster-bubble";
+    bub.textContent = String(n);
+    bub.style.left = `${sx / n}px`;
+    bub.style.top = `${sy / n}px`;
+    clusterEl.appendChild(bub);
+  }
+}
+let lastCluster = 0;
+globe.onFrame((ms) => {
+  if (ms - lastCluster < 120) return; // 約8fpsに間引き
+  lastCluster = ms;
+  renderClusters();
+});
 
 // ---- 時間軸（潮流用。config を流用） ------------------------------------
 const STEP_MS = TIME_STEP_MIN * 60_000;
