@@ -61,6 +61,16 @@ export class Globe {
     key.position.set(-1.1, 0.9, 0.7);
     this.scene.add(key);
 
+    // --- 海の深度プリパス: 色は書かず深度だけ書き込む球。
+    //     半透明の海は不透明パスから外れて裏側を隠せないため、先にこの球で
+    //     海面の深度を書き、裏側（地球の反対側）のジオメトリを depthTest で隠す。 ---
+    const oceanDepth = new THREE.Mesh(
+      new THREE.SphereGeometry(EARTH_RADIUS * 0.999, 64, 64),
+      new THREE.MeshBasicMaterial({ colorWrite: false })
+    );
+    oceanDepth.renderOrder = -1; // 他より先に深度を確定させる
+    this.scene.add(oceanDepth);
+
     // --- 海（地球本体）: つや消しの藍墨の球。少し透明にしてガラス質の質感に ---
     const oceanGeo = new THREE.SphereGeometry(EARTH_RADIUS, 96, 96);
     const oceanMat = new THREE.MeshStandardMaterial({
@@ -68,7 +78,8 @@ export class Globe {
       roughness: 1,
       metalness: 0,
       transparent: true,
-      opacity: 0.82, // 「少し透明」＝奥の経緯線がうっすら透ける
+      opacity: 0.82,      // 「少し透明」＝ガラス質の質感
+      depthWrite: false,  // 深度はプリパスが担当（自身は書かない）
     });
     this.ocean = new THREE.Mesh(oceanGeo, oceanMat);
     this.scene.add(this.ocean);

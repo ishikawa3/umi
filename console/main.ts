@@ -70,31 +70,40 @@ clusterEl.className = "cluster-overlay";
 chartEl.appendChild(clusterEl);
 const CLUSTER_PX = 30; // この画面距離内のマーカーを1グループに束ねる
 
-/** いま地図に出ているマーカーの世界座標と色を集める */
-function currentMarkers(): { v: ReturnType<typeof latLonToVec3>; color: string }[] {
-  const out: { v: ReturnType<typeof latLonToVec3>; color: string }[] = [];
-  if (warnings.isVisible()) for (const w of warnings.visibleWarnings()) out.push({ v: latLonToVec3(w.lat, w.lon, 1.02), color: w.category.color });
-  if (tide.isVisible()) for (const e of tideEntries) out.push({ v: latLonToVec3(e.station.lat, e.station.lon, 1.02), color: "#5ee0d8" });
+/** いま地図に出ているマーカーの世界座標を集める（潮位ヘッドは実際の高さを使う） */
+function currentMarkers(): ReturnType<typeof latLonToVec3>[] {
+  const out: ReturnType<typeof latLonToVec3>[] = [];
+  if (warnings.isVisible()) for (const w of warnings.visibleWarnings()) out.push(latLonToVec3(w.lat, w.lon, 1.02));
+  // 検潮所は潮位で棒の高さが変わるため、TideLayer が持つ実際のヘッド座標を使う
+  if (tide.isVisible()) for (const v of tide.headPositions()) out.push(v.clone());
   return out;
 }
-/** マーカーを画面上で束ね、2件以上のかたまりに件数バブルを出す */
+/** マーカーを画面上で束ね、2件以上のかたまりに件数バブルを出す（連結成分でクラスタ化） */
 function renderClusters(): void {
   const rect = globe.renderer.domElement.getBoundingClientRect();
   const W = rect.width, H = rect.height;
-  const pts: { x: number; y: number; color: string }[] = [];
-  for (const m of currentMarkers()) {
-    if (!isFacingCamera(m.v, globe.camera)) continue; // 地球の裏側は除外
-    const s = projectToScreen(m.v, globe.camera, W, H);
-    if (s) pts.push({ x: s.x, y: s.y, color: m.color });
+  const pts: { x: number; y: number }[] = [];
+  for (const v of currentMarkers()) {
+    if (!isFacingCamera(v, globe.camera)) continue; // 地球の裏側は除外
+    const s = projectToScreen(v, globe.camera, W, H);
+    if (s) pts.push({ x: s.x, y: s.y });
   }
+  // 連結成分クラスタ: 近接（<CLUSTER_PX）でつながる点を BFS で1グループに閉包する
   const used = new Array(pts.length).fill(false);
   clusterEl.textContent = "";
+  const r2 = CLUSTER_PX * CLUSTER_PX;
   for (let i = 0; i < pts.length; i++) {
     if (used[i]) continue;
-    let sx = pts[i].x, sy = pts[i].y, n = 1; used[i] = true;
-    for (let j = i + 1; j < pts.length; j++) {
-      if (used[j]) continue;
-      if (Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y) < CLUSTER_PX) { sx += pts[j].x; sy += pts[j].y; n++; used[j] = true; }
+    const queue = [i]; used[i] = true;
+    let sx = 0, sy = 0, n = 0;
+    while (queue.length) {
+      const k = queue.pop()!;
+      sx += pts[k].x; sy += pts[k].y; n++;
+      for (let j = 0; j < pts.length; j++) {
+        if (used[j]) continue;
+        const dx = pts[k].x - pts[j].x, dy = pts[k].y - pts[j].y;
+        if (dx * dx + dy * dy < r2) { used[j] = true; queue.push(j); }
+      }
     }
     if (n < 2) continue; // 単独マーカーはそのまま（3Dピンが見える）
     const bub = document.createElement("div");
