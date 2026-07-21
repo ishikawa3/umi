@@ -32,11 +32,23 @@
 
     <!-- 本体: 左レイヤ / 中央3D海図 / 右インスペクタ -->
     <div class="body">
-      <aside class="panel left" aria-label="レイヤと種別フィルタ">
+      <aside class="panel left" aria-label="レイヤ・海域・凡例">
         <h2>レイヤ</h2>
         <div id="layer-list"></div>
-        <h2>種別フィルタ</h2>
-        <div id="filter-list"></div>
+        <div id="warn-filter-section">
+          <h2>警報 種別フィルタ</h2>
+          <div id="filter-list"></div>
+        </div>
+        <div id="area-section" hidden>
+          <h2>海域 · 潮流</h2>
+          <div class="area-box">
+            <select id="area-select" class="area-select" aria-label="潮流の海域"></select>
+          </div>
+        </div>
+        <div id="legend-section" hidden>
+          <h2>凡例</h2>
+          <div id="legend" class="legend"></div>
+        </div>
       </aside>
 
       <main class="chart" id="chart" aria-label="3D海図（海しるデータの運用コンソール）">
@@ -59,8 +71,15 @@
       <span class="mono" id="st-coord">緯経 —</span>
       <span class="mono" id="st-zoom">ズーム —</span>
       <span class="mono" id="st-count">海域 —</span>
+      <span class="time-ctl" id="time-ctl" hidden>
+        <button id="time-play" class="time-play" aria-label="潮流の再生/一時停止">❚❚</button>
+        <input type="range" id="time-slider" min="0" max="1" step="0.01" aria-label="潮流の時刻" />
+        <span class="mono" id="time-label">—</span>
+      </span>
       <span class="ticker" id="ticker">—</span>
     </footer>
+
+    <div id="tooltip" role="tooltip"></div>
 
     <p class="credit">
       データ: 海上保安庁

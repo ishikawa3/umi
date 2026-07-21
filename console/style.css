@@ -139,6 +139,68 @@ body {
   padding: 0.05rem 0.3rem;
 }
 
+/* 海域セレクト（潮流） */
+.area-box { padding: 0.2rem 1rem 0.8rem; }
+.area-select {
+  width: 100%;
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  color: var(--fg);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.35rem 0.5rem;
+}
+
+/* 凡例 */
+.legend { padding: 0.1rem 1rem 1rem; }
+.lg-row { margin-bottom: 0.7rem; }
+.lg-label { font-size: 0.72rem; color: var(--fg-dim); margin-bottom: 0.2rem; }
+.lg-bar {
+  height: 8px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+}
+.lg-ticks {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  color: var(--fg-dim);
+  margin-top: 0.15rem;
+}
+
+/* 時刻スクラバ（潮流） */
+.time-ctl { display: inline-flex; align-items: center; gap: 0.5rem; min-width: 220px; }
+.time-play {
+  font-size: 0.66rem;
+  color: var(--fg);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.05rem 0.35rem;
+  cursor: pointer;
+}
+.time-ctl input[type="range"] { flex: 1; accent-color: var(--ok); height: 2px; }
+#time-label { min-width: 8.5em; }
+
+/* ホバーツールチップ */
+#tooltip {
+  position: fixed;
+  z-index: 6;
+  pointer-events: none;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--fg);
+  background: rgba(244, 248, 247, 0.92);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.2rem 0.45rem;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+#tooltip.visible { opacity: 1; }
+
 /* 海図（3D） */
 .chart {
   position: relative;
