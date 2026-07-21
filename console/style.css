@@ -481,15 +481,67 @@ body {
 .credit a { color: var(--ok); text-decoration: none; }
 .credit a:hover { text-decoration: underline; }
 
-/* ---- レスポンシブ（最低限崩れない） ---- */
-@media (max-width: 900px) {
-  .body { grid-template-columns: 200px 1fr; }
-  .panel.right { display: none; }
-  .credit { right: 1rem; }
+/* 横はみ出し防止（ティッカーが縮まず幅を押し広げるのを防ぐ） */
+.statusbar { min-width: 0; }
+.statusbar .ticker { min-width: 0; }
+
+/* ---- モバイル用のタブバー／バックドロップ（既定は非表示） ---- */
+.m-tabbar {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 46px;
+  z-index: 32;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
 }
-@media (max-width: 640px) {
+.m-tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--fg);
+  font-family: var(--sans);
+  font-size: 0.86rem;
+  cursor: pointer;
+}
+.m-tab + .m-tab { border-left: 1px solid var(--line); }
+.m-tab.active { color: var(--ok); background: var(--panel-2); }
+.m-backdrop {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 28;
+}
+
+/* ---- レスポンシブ ---- */
+/* タブレット: 3カラムのまま幅を詰める */
+@media (max-width: 1040px) and (min-width: 821px) {
+  .body { grid-template-columns: 208px 1fr 288px; }
+}
+/* モバイル/小型: 地図を全画面、左右パネルはボトムシートのドロワーに ---- */
+@media (max-width: 820px) {
   .body { grid-template-columns: 1fr; }
-  .panel.left { display: none; }
-  .hdr { gap: 0.7rem; flex-wrap: wrap; }
-  .hdr .clock { font-size: 0.72rem; }
+  .hdr { gap: 0.6rem; flex-wrap: wrap; }
+  .hdr .duty { display: none; }
+  .hdr .clock { font-size: 0.7rem; }
+  .statusbar { display: none; } /* 情報はドロワー／ヘッダに集約 */
+
+  .panel.left, .panel.right {
+    position: fixed;
+    left: 0; right: 0; bottom: 46px; top: auto;
+    height: min(72vh, 540px);
+    transform: translateY(calc(100% + 46px)); /* 画面外へ隠す */
+    transition: transform 0.26s ease;
+    z-index: 30;
+    border: none;
+    border-top: 1px solid var(--line);
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.55);
+  }
+  .panel.left.open, .panel.right.open { transform: translateY(0); }
+
+  .m-tabbar { display: flex; }
+  .m-backdrop.show { display: block; }
+
+  .credit { right: 0.6rem; bottom: 52px; max-width: 74vw; font-size: 0.6rem; }
 }

@@ -121,6 +121,30 @@ globe.onFrame((ms) => {
   renderClusters();
 });
 
+// ---- モバイル: パネルをボトムシートで開閉 --------------------------------
+const mLayersBtn = $("m-layers");
+const mDetailBtn = $("m-detail");
+const mBackdrop = $("m-backdrop");
+const leftPanel = document.querySelector(".panel.left") as HTMLElement;
+const rightPanel = document.querySelector(".panel.right") as HTMLElement;
+function closeSheets(): void {
+  leftPanel.classList.remove("open");
+  rightPanel.classList.remove("open");
+  mBackdrop.classList.remove("show");
+  mLayersBtn.classList.remove("active");
+  mDetailBtn.classList.remove("active");
+}
+function toggleSheet(which: "left" | "right"): void {
+  const panel = which === "left" ? leftPanel : rightPanel;
+  const btn = which === "left" ? mLayersBtn : mDetailBtn;
+  const wasOpen = panel.classList.contains("open");
+  closeSheets();
+  if (!wasOpen) { panel.classList.add("open"); btn.classList.add("active"); mBackdrop.classList.add("show"); }
+}
+mLayersBtn.addEventListener("click", () => toggleSheet("left"));
+mDetailBtn.addEventListener("click", () => toggleSheet("right"));
+mBackdrop.addEventListener("click", closeSheets);
+
 // ---- 時間軸（潮流用。config を流用） ------------------------------------
 const STEP_MS = TIME_STEP_MIN * 60_000;
 const now = new Date();
