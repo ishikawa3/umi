@@ -72,7 +72,7 @@ export class WarningsLayer {
     this.globe = globe;
     this.capacity = capacity;
 
-    const geo = new THREE.SphereGeometry(0.012, 12, 12);
+    const geo = new THREE.SphereGeometry(0.0075, 12, 12);
     const mat = new THREE.MeshBasicMaterial({ color: 0xffffff }); // 実色は instanceColor
     this.mesh = new THREE.InstancedMesh(geo, mat, capacity);
     this.mesh.count = 0;
@@ -80,7 +80,7 @@ export class WarningsLayer {
     // instanceColor バッファを確保
     this.mesh.setColorAt(0, new THREE.Color(0xffffff));
 
-    const haloGeo = new THREE.SphereGeometry(0.024, 16, 16);
+    const haloGeo = new THREE.SphereGeometry(0.015, 16, 16);
     const haloMat = new THREE.MeshBasicMaterial({
       color: 0xffffff,
       transparent: true,

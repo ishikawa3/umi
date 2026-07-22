@@ -9,13 +9,15 @@ import { latLonToVec3, vec3ToLatLon, EARTH_RADIUS } from "./geo";
 import { COASTLINE } from "./coastline";
 import { LAND } from "./land";
 
-// 配色トークン（ダーク管制センター）。暗い海に明るいデータを浮かせる
-const SEA = new THREE.Color("#0f2c44"); // 深い藍墨の海（暗いほどデータが映える）
-const LAND_COLOR = new THREE.Color("#34556e"); // 陸（海より明るいスレートで地形を見せる）
-const SKY_LIGHT = new THREE.Color("#2b4d66"); // 半球光の上（薄明の空）
-const HAZE = new THREE.Color("#3d7d92"); // 大気の縁光（シアン寄り）
-const GRATICULE = new THREE.Color("#33607a"); // 経緯線（低コントラスト）
-const COAST = new THREE.Color("#7fb4cc"); // 海岸線（明るいシアングレーで陸をくっきり縁取る）
+// 配色トークン（ダーク管制センター）。暗い海に明るいデータを浮かせる。
+// ただし暗すぎると地図が読めない（＝見えづらい）ので、海と陸・陸と背景の
+// コントラストを確保し、球としての立体感（明暗の終端線）を残す。
+const SEA = new THREE.Color("#13324a"); // 灯りの当たる深い藍の海（背景より明るく＝球が浮く）
+const LAND_COLOR = new THREE.Color("#4a7086"); // 陸（海よりはっきり明るいスレートで地形を読ませる）
+const SKY_LIGHT = new THREE.Color("#32526b"); // 半球光の上（薄明の空）
+const HAZE = new THREE.Color("#6bb6cc"); // 大気の縁光（シアン寄り。球の輪郭を締める）
+const GRATICULE = new THREE.Color("#3a6178"); // 経緯線（低コントラスト・控えめ）
+const COAST = new THREE.Color("#9fcfe6"); // 海岸線（明るいシアングレーで陸をくっきり縁取る）
 
 /** 日本近海に初期カメラを寄せるための代表点 */
 const JAPAN_LAT = 37;
@@ -54,10 +56,10 @@ export class Globe {
     this.controls.maxDistance = 4.2;
 
     // --- 光: 半球光でやわらかく（空=薄明色, 地=海の藍墨）＋弱い方向光 ---
-    const hemi = new THREE.HemisphereLight(SKY_LIGHT, SEA.clone().multiplyScalar(0.28), 0.85);
+    const hemi = new THREE.HemisphereLight(SKY_LIGHT, SEA.clone().multiplyScalar(0.35), 1.0);
     this.scene.add(hemi);
     // やわらかい方向光で球にゆるい明暗（終端線）を作り、立体に見せる
-    const key = new THREE.DirectionalLight(0xffffff, 0.6);
+    const key = new THREE.DirectionalLight(0xffffff, 0.75);
     key.position.set(-1.1, 0.9, 0.7);
     this.scene.add(key);
 
@@ -78,7 +80,7 @@ export class Globe {
       roughness: 1,
       metalness: 0,
       transparent: true,
-      opacity: 0.82,      // 「少し透明」＝ガラス質の質感
+      opacity: 0.94,      // ほぼ不透明（海の色を効かせて地図を読みやすく）＋わずかな透け
       depthWrite: false,  // 深度はプリパスが担当（自身は書かない）
     });
     this.ocean = new THREE.Mesh(oceanGeo, oceanMat);
@@ -186,8 +188,8 @@ export class Globe {
         varying vec3 vP;
         void main() {
           vec3 v = normalize(-vP);
-          float f = pow(1.0 - abs(dot(vN, v)), 2.2);
-          gl_FragColor = vec4(uColor, f * 0.5);
+          float f = pow(1.0 - abs(dot(vN, v)), 2.4);
+          gl_FragColor = vec4(uColor, f * 0.7);
         }
       `,
     });
