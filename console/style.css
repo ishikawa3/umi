@@ -4,24 +4,24 @@
 
 :root {
   /* ダーク管制センター（VTS/レーダー風）。暗い海に明るいデータを浮かせる高コントラスト */
-  --bg: #0a1826;
-  --bg-2: #07111c;
-  --panel: #0c1826;
-  --panel-2: #11202f;
-  --fg: #e4eef6;
-  --fg-dim: #8aa0b4;
-  --line: rgba(110, 150, 180, 0.20);
-  --ok: #5ee0d8;
-  --warn: #f0b64e;
-  --alert: #ff6b5e;
+  --bg: #0b1522;        /* 背景（最も暗い） */
+  --bg-2: #070f19;
+  --panel: #0f1b29;     /* パネルは背景よりわずかに持ち上げて層を作る */
+  --panel-2: #15222f;
+  --fg: #e7eef6;
+  --fg-dim: #8093a7;
+  --line: rgba(135, 170, 205, 0.13);   /* 罫線はより繊細に */
+  --line-strong: rgba(135, 170, 205, 0.22);
+  --ok: #56d8cf;        /* シアン（ほんの少し落ち着かせる） */
+  --warn: #efb457;
+  --alert: #f5675c;
   --lav: #b9c0e0;
 
   --sans: ui-sans-serif, "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
   --mono: ui-monospace, "SF Mono", "Roboto Mono", "Menlo", monospace;
-  --script: "Segoe Script", "Bradley Hand", "Comic Sans MS", cursive;
 
   --radius: 8px;
-  --shadow: 0 2px 16px rgba(0, 0, 0, 0.45);
+  --shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -46,20 +46,23 @@ body {
   display: flex;
   align-items: center;
   gap: 1.2rem;
-  padding: 0.6rem 1.2rem;
+  padding: 0.55rem 1.2rem;
   border-bottom: 1px solid var(--line);
-  backdrop-filter: blur(2px);
+  background: rgba(9, 17, 28, 0.55);
+  backdrop-filter: blur(3px);
 }
-.brand { display: flex; align-items: baseline; gap: 0.6rem; }
+.brand { display: flex; align-items: baseline; gap: 0.55rem; }
 .brand .mark {
-  font-family: var(--script);
-  font-size: 1.5rem;
+  font-family: "Hiragino Mincho ProN", "Yu Mincho", Georgia, serif;
+  font-size: 1.3rem;
+  font-weight: 500;
   color: var(--ok);
+  letter-spacing: 0.06em;
   line-height: 1;
 }
 .brand .sub {
-  font-size: 0.72rem;
-  letter-spacing: 0.22em;
+  font-size: 0.68rem;
+  letter-spacing: 0.24em;
   color: var(--fg-dim);
   text-transform: uppercase;
 }
@@ -81,7 +84,7 @@ body {
   background: var(--warn);
   box-shadow: 0 0 0 3px rgba(240, 182, 78, 0.22);
 }
-.conn .led[data-state="ok"] { background: var(--ok); box-shadow: 0 0 8px rgba(94, 224, 216, 0.5), 0 0 0 3px rgba(94, 224, 216, 0.22); }
+.conn .led[data-state="ok"] { background: var(--ok); box-shadow: 0 0 8px rgba(86, 216, 207, 0.5), 0 0 0 3px rgba(86, 216, 207, 0.22); }
 .conn .led[data-state="down"] { background: var(--alert); box-shadow: 0 0 8px rgba(255, 107, 94, 0.5), 0 0 0 3px rgba(255, 107, 94, 0.22); }
 .conn .led[data-state="checking"] { background: var(--warn); box-shadow: 0 0 0 3px rgba(240, 182, 78, 0.22); }
 .conn .txt { font-size: 0.72rem; color: var(--fg-dim); letter-spacing: 0.04em; }
@@ -111,12 +114,12 @@ body {
   text-transform: none;
 }
 .panel h2 {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 600;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.1em;
   color: var(--fg-dim);
   text-transform: uppercase;
-  padding: 0.9rem 1rem 0.5rem;
+  padding: 0.85rem 1rem 0.45rem;
 }
 
 /* レイヤ一覧 */
@@ -251,20 +254,20 @@ body {
 .cluster-bubble {
   position: absolute;
   transform: translate(-50%, -50%);
-  min-width: 1.5em;
-  height: 1.5em;
-  padding: 0 0.35em;
+  min-width: 1.2em;
+  height: 1.2em;
+  padding: 0 0.3em;
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--mono);
-  font-size: 0.72rem;
+  font-size: 0.64rem;
   font-weight: 700;
   color: #08131f;
   background: var(--ok);
-  border: 1px solid rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 999px;
-  box-shadow: 0 0 10px rgba(94, 224, 216, 0.55);
+  box-shadow: 0 0 7px rgba(86, 216, 207, 0.4);
 }
 
 /* 右パネルのタブ */
@@ -314,7 +317,7 @@ body {
 }
 .tide-row:first-child { border-top: none; }
 .tide-row.tide-head { position: sticky; top: 0; background: var(--panel); z-index: 1; }
-.tide-row:not(.tide-head):hover, .tide-row.hover, .tide-row.hot { background: rgba(94, 224, 216, 0.14); }
+.tide-row:not(.tide-head):hover, .tide-row.hover, .tide-row.hot { background: rgba(86, 216, 207, 0.10); }
 .tide-cell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tide-cell.num { font-family: var(--mono); text-align: right; }
 .tide-cell.th {
@@ -390,7 +393,7 @@ body {
   cursor: pointer;
 }
 .warn-row:first-child { border-top: none; }
-.warn-row:hover, .warn-row.hot { background: rgba(94, 224, 216, 0.14); }
+.warn-row:hover, .warn-row.hot { background: rgba(86, 216, 207, 0.10); }
 .warn-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; }
 .warn-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
