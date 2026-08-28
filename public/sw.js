@@ -41,7 +41,11 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(req)
         .then((res) => { cachePut(req, res.clone()); return res; })
-        .catch(() => caches.match(req).then((r) => r || caches.match(OFFLINE_URL)))
+        .catch(async (err) => {
+          const hit = (await caches.match(req)) || (await caches.match(OFFLINE_URL));
+          if (hit) return hit;
+          throw err; // 下記と同じ理由で undefined を返さない
+        })
     );
     return;
   }
@@ -50,7 +54,9 @@ self.addEventListener("fetch", (event) => {
     caches.match(req).then((cached) => {
       const network = fetch(req)
         .then((res) => { cachePut(req, res.clone()); return res; })
-        .catch(() => cached);
+        // キャッシュが無いまま undefined を返すと respondWith が TypeError になり、
+        // 本来のネットワークエラーが隠れる（オフライン初回など）。エラーを伝播させる。
+        .catch((err) => { if (cached) return cached; throw err; });
       return cached || network;
     })
   );

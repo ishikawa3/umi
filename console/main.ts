@@ -23,7 +23,13 @@ import { latLonToVec3, projectToScreen, isFacingCamera } from "./geo";
 
 const JAPAN_BBOX: [number, number, number, number] = [122, 24, 148, 46];
 
-const $ = (id: string) => document.getElementById(id)!;
+// 非nullアサーション(!)は null を隠して後段で分かりにくく落ちるため、
+// 取得できなければどのIDで失敗したかを明示して即座に落とす。
+const $ = (id: string): HTMLElement => {
+  const el = document.getElementById(id);
+  if (!el) throw new Error(`必須要素が見つかりません: #${id}`);
+  return el;
+};
 const chartEl = $("chart");
 const clockEl = $("clock");
 const ledEl = $("conn-led");
@@ -125,7 +131,7 @@ globe.onFrame((ms) => {
 const mLayersBtn = $("m-layers");
 const mDetailBtn = $("m-detail");
 const mBackdrop = $("m-backdrop");
-// as でのキャストは null を隠して実行時に落ちうるので、見つからなければ明示的に落とす
+// $ のセレクタ版。方針は同じで、見つからなければ明示的に落とす
 const $sel = (sel: string): HTMLElement => {
   const el = document.querySelector<HTMLElement>(sel);
   if (!el) throw new Error(`必須要素が見つかりません: ${sel}`);
