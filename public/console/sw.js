@@ -44,7 +44,7 @@ self.addEventListener("fetch", (event) => {
       fetch(req)
         .then((res) => { cachePut(req, res.clone()); return res; })
         .catch(async (err) => {
-          const hit = (await caches.match(req)) || (await caches.match(OFFLINE_URL));
+          const hit = (await fromCache(req)) || (await fromCache(OFFLINE_URL));
           if (hit) return hit;
           throw err; // 下記と同じ理由で undefined を返さない
         })
@@ -53,7 +53,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   event.respondWith(
-    caches.match(req).then((cached) => {
+    fromCache(req).then((cached) => {
       const network = fetch(req)
         .then((res) => { cachePut(req, res.clone()); return res; })
         // キャッシュが無いまま undefined を返すと respondWith が TypeError になり、
@@ -63,6 +63,14 @@ self.addEventListener("fetch", (event) => {
     })
   );
 });
+
+// 引数なしの caches.match() はオリジン内の全キャッシュを横断するため、
+// 同居する うみ（umi-*）のエントリまで拾ってしまう。
+// 例えば kaisho-v2 へ上げても umi-v1 に残る同一URLの古いコピーを返してしまい、
+// 世代更新が効かない。自分の CACHE だけを検索対象にする。
+function fromCache(req) {
+  return caches.open(CACHE).then((c) => c.match(req));
+}
 
 function cachePut(req, res) {
   if (!res || res.status !== 200 || res.type === "opaque") return;
