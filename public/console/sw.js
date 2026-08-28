@@ -17,7 +17,10 @@ const PRECACHE = ["./", "./index.html", "./manifest.webmanifest", "./icons/kaish
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(PRECACHE)).catch(() => {}));
+  // プリキャッシュの失敗は握りつぶさない。握りつぶすとシェル未取得のまま
+  // インストール成功扱いになり、オフライン復帰が壊れていても気づけない。
+  // ここで reject させればインストールが失敗し、次の読み込みで再試行される。
+  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(PRECACHE)));
 });
 
 self.addEventListener("activate", (event) => {

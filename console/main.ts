@@ -125,21 +125,32 @@ globe.onFrame((ms) => {
 const mLayersBtn = $("m-layers");
 const mDetailBtn = $("m-detail");
 const mBackdrop = $("m-backdrop");
-const leftPanel = document.querySelector(".panel.left") as HTMLElement;
-const rightPanel = document.querySelector(".panel.right") as HTMLElement;
+// as でのキャストは null を隠して実行時に落ちうるので、見つからなければ明示的に落とす
+const $sel = (sel: string): HTMLElement => {
+  const el = document.querySelector<HTMLElement>(sel);
+  if (!el) throw new Error(`必須要素が見つかりません: ${sel}`);
+  return el;
+};
+const leftPanel = $sel(".panel.left");
+const rightPanel = $sel(".panel.right");
+/** 開閉状態は見た目(active)だけでなく aria-pressed にも反映する（読み上げ対応） */
+function setTabState(btn: HTMLElement, open: boolean): void {
+  btn.classList.toggle("active", open);
+  btn.setAttribute("aria-pressed", String(open));
+}
 function closeSheets(): void {
   leftPanel.classList.remove("open");
   rightPanel.classList.remove("open");
   mBackdrop.classList.remove("show");
-  mLayersBtn.classList.remove("active");
-  mDetailBtn.classList.remove("active");
+  setTabState(mLayersBtn, false);
+  setTabState(mDetailBtn, false);
 }
 function toggleSheet(which: "left" | "right"): void {
   const panel = which === "left" ? leftPanel : rightPanel;
   const btn = which === "left" ? mLayersBtn : mDetailBtn;
   const wasOpen = panel.classList.contains("open");
   closeSheets();
-  if (!wasOpen) { panel.classList.add("open"); btn.classList.add("active"); mBackdrop.classList.add("show"); }
+  if (!wasOpen) { panel.classList.add("open"); setTabState(btn, true); mBackdrop.classList.add("show"); }
 }
 mLayersBtn.addEventListener("click", () => toggleSheet("left"));
 mDetailBtn.addEventListener("click", () => toggleSheet("right"));

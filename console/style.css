@@ -527,7 +527,28 @@ body {
   .hdr { gap: 0.6rem; flex-wrap: wrap; }
   .hdr .duty { display: none; }
   .hdr .clock { font-size: 0.7rem; }
-  .statusbar { display: none; } /* 情報はドロワー／ヘッダに集約 */
+  /* 読み取り専用の情報（緯経/ズーム/海域/ティッカー）はドロワー・ヘッダに集約するが、
+     操作系の潮流タイムコントロールだけはモバイルでも触れる必要があるため残す。
+     バー自体は背景・枠なしの透明な入れ物にして、time-ctl が hidden のときは
+     何も見えず、タップも奪わない（pointer-events: none）。 */
+  .statusbar {
+    position: fixed;
+    left: 0; right: 0; bottom: 46px; /* タブバーの上 */
+    z-index: 25;
+    padding: 0; border: none; background: none; box-shadow: none;
+    pointer-events: none;
+  }
+  .statusbar > *:not(.time-ctl) { display: none; }
+  /* [hidden] 時は .time-ctl[hidden]{display:none} を勝たせたいので :not([hidden]) で限定 */
+  .statusbar .time-ctl:not([hidden]) {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    pointer-events: auto;
+    padding: 0.4rem 0.7rem;
+    background: var(--panel);
+    border-top: 1px solid var(--line);
+  }
 
   .panel.left, .panel.right {
     position: fixed;
