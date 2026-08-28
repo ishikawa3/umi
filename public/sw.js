@@ -5,7 +5,11 @@
 // - 「海しる」等の外部APIは同一オリジン外なので SW を通さない（常にネットワーク）
 // パスは SW 自身の位置（/umi/sw.js）基準の相対で、GitHub Pages の /umi/ 配下で正しく解決される。
 
-const CACHE = "umi-v1";
+// CacheStorage はスコープではなく「オリジン」単位で共有される。かいしょう
+// （/umi/console/）の SW と同居するため、自分のプレフィックスのキャッシュ
+// だけを世代管理し、他アプリのキャッシュには触れない。
+const PREFIX = "umi-";
+const CACHE = PREFIX + "v1";
 const OFFLINE_URL = "./"; // start_url（オフライン時のフォールバック）
 const PRECACHE = ["./", "./index.html", "./manifest.webmanifest", "./icons/umi-192.png", "./icons/umi-512.png"];
 
@@ -17,7 +21,9 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(
+        keys.filter((k) => k.startsWith(PREFIX) && k !== CACHE).map((k) => caches.delete(k))
+      ))
       .then(() => self.clients.claim())
   );
 });
