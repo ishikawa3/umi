@@ -26,6 +26,20 @@
       "description": "海上保安庁「海しる」APIの潮流推算データによるリアルタイム・フローフィールド"
     }
     </script>
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="icons/umi-192.png" />
+    <meta name="theme-color" content="#04070f" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="うみ" />
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("./sw.js").catch(() => {});
+        });
+      }
+    </script>
   </head>
   <body>
     <canvas id="sea" aria-label="海上保安庁「海しる」APIの潮流推算データによるリアルタイム・フローフィールド"></canvas>

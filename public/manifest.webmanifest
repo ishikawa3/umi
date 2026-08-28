@@ -1,0 +1,19 @@
+{
+  "name": "うみ — 潮流のかたち",
+  "short_name": "うみ",
+  "description": "海上保安庁「海しる」APIの実データで、日本の海の「いま」を描くデータアート",
+  "lang": "ja",
+  "dir": "ltr",
+  "start_url": "/umi/",
+  "scope": "/umi/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#04070f",
+  "theme_color": "#04070f",
+  "categories": ["education", "utilities"],
+  "icons": [
+    { "src": "icons/umi-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/umi-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/umi-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
