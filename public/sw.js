@@ -31,16 +31,29 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+// この SW のスコープは /umi/ なので、かいしょうの SW が有効になるまでは
+// /umi/console/ 配下もこの SW の制御下に入ってしまう。かいしょうは独立アプリで
+// 自前の SW がオフラインを担うため、ここでは一切扱わず素通しする。
+// （console のHTML/アセットを umi-* に取り込む、console のナビゲーションに
+//   うみのシェルを返す、といった混線を防ぐ）
+const CONSOLE_PATH = new URL("./console/", self.location).pathname;
+
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return; // 外部API等は素通し
+  if (url.pathname.startsWith(CONSOLE_PATH)) return; // かいしょうの領分は触らない
 
   if (req.mode === "navigate") {
     event.respondWith(
       fetch(req)
-        .then((res) => { cachePut(req, res.clone()); return res; })
+        .then((res) => {
+          // 書き込みを fetch イベントの寿命に紐づけ、応答直後に SW が止まっても
+          // 途中で打ち切られないようにする（応答自体は待たせない）
+          event.waitUntil(cachePut(req, res.clone()));
+          return res;
+        })
         .catch(async (err) => {
           const hit = (await fromCache(req)) || (await fromCache(OFFLINE_URL));
           if (hit) return hit;
@@ -53,10 +66,13 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     fromCache(req).then((cached) => {
       const network = fetch(req)
-        .then((res) => { cachePut(req, res.clone()); return res; })
+        .then((res) => { event.waitUntil(cachePut(req, res.clone())); return res; })
         // キャッシュが無いまま undefined を返すと respondWith が TypeError になり、
         // 本来のネットワークエラーが隠れる（オフライン初回など）。エラーを伝播させる。
         .catch((err) => { if (cached) return cached; throw err; });
+      // cached を即返す場合、背景の再検証が SW 停止で打ち切られないよう延命する。
+      // respondWith が解決する前（＝イベントが有効なうち）に呼ぶ必要がある。
+      event.waitUntil(network.catch(() => {}));
       return cached || network;
     })
   );
@@ -70,7 +86,8 @@ function fromCache(req) {
   return caches.open(CACHE).then((c) => c.match(req));
 }
 
+// waitUntil(undefined) が例外になるブラウザがあるため、常に Promise を返す
 function cachePut(req, res) {
-  if (!res || res.status !== 200 || res.type === "opaque") return;
-  caches.open(CACHE).then((c) => c.put(req, res)).catch(() => {});
+  if (!res || res.status !== 200 || res.type === "opaque") return Promise.resolve();
+  return caches.open(CACHE).then((c) => c.put(req, res)).catch(() => {});
 }
