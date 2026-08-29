@@ -24,22 +24,31 @@ function pwaPrecache(): Plugin {
         { sw: join(dist, "console", "sw.js"), html: [join("console", "index.html")] },
       ];
       for (const app of apps) {
-        if (!existsSync(app.sw)) continue;
+        // 黙って飛ばすと「注入されていないSW」をそのまま配布してしまい、
+        // オフライン起動が静かに壊れる。想定が崩れたらビルドを失敗させる。
+        if (!existsSync(app.sw)) {
+          throw new Error(`pwa-precache: SW が見つかりません: ${app.sw}`);
+        }
         const assets = new Set<string>();
         for (const rel of app.html) {
           const file = join(dist, rel);
-          if (!existsSync(file)) continue;
+          if (!existsSync(file)) {
+            throw new Error(`pwa-precache: ビルド成果物のHTMLが見つかりません: ${file}`);
+          }
           const html = readFileSync(file, "utf8");
           // src="/umi/assets/…" / href="/umi/assets/…"（modulepreload と CSS を含む）
           for (const m of html.matchAll(/(?:src|href)="([^"]*\/assets\/[^"]+)"/g)) assets.add(m[1]);
         }
         const list = [...assets].sort();
+        if (list.length === 0) {
+          throw new Error(`pwa-precache: アセットを1件も検出できません: ${app.sw}`);
+        }
         const sw = readFileSync(app.sw, "utf8");
-        const injected = sw.replace(
-          "/* __PRECACHE_ASSETS__ */",
-          list.map((a) => JSON.stringify(a)).join(", ")
-        );
-        writeFileSync(app.sw, injected);
+        const token = "/* __PRECACHE_ASSETS__ */";
+        if (!sw.includes(token)) {
+          throw new Error(`pwa-precache: プレースホルダ ${token} が見つかりません: ${app.sw}`);
+        }
+        writeFileSync(app.sw, sw.replace(token, list.map((a) => JSON.stringify(a)).join(", ")));
         this.info?.(`pwa-precache: ${app.sw} に ${list.length} 件のアセットを注入`);
       }
     },
