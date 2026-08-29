@@ -14,6 +14,19 @@
     <meta property="og:url" content="https://ishikawa3.github.io/umi/console/" />
     <meta property="og:locale" content="ja_JP" />
     <link rel="canonical" href="https://ishikawa3.github.io/umi/console/" />
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="icons/kaisho-192.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="かいしょう" />
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("./sw.js").catch(() => {});
+        });
+      }
+    </script>
   </head>
   <body>
     <!-- ヘッダ -->
@@ -94,6 +107,13 @@
       </span>
       <span class="ticker" id="ticker">—</span>
     </footer>
+
+    <!-- モバイル用: パネルをボトムシートで開くタブバー＋背景 -->
+    <div id="m-backdrop" class="m-backdrop" aria-hidden="true"></div>
+    <nav class="m-tabbar" aria-label="パネル切替">
+      <button id="m-layers" class="m-tab" type="button" aria-pressed="false">レイヤ</button>
+      <button id="m-detail" class="m-tab" type="button" aria-pressed="false">一覧・詳細</button>
+    </nav>
 
     <div id="tooltip" role="tooltip"></div>
     <div id="toast" role="status" aria-live="polite"></div>

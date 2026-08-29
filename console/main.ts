@@ -23,7 +23,13 @@ import { latLonToVec3, projectToScreen, isFacingCamera } from "./geo";
 
 const JAPAN_BBOX: [number, number, number, number] = [122, 24, 148, 46];
 
-const $ = (id: string) => document.getElementById(id)!;
+// 非nullアサーション(!)は null を隠して後段で分かりにくく落ちるため、
+// 取得できなければどのIDで失敗したかを明示して即座に落とす。
+const $ = (id: string): HTMLElement => {
+  const el = document.getElementById(id);
+  if (!el) throw new Error(`必須要素が見つかりません: #${id}`);
+  return el;
+};
 const chartEl = $("chart");
 const clockEl = $("clock");
 const ledEl = $("conn-led");
@@ -120,6 +126,41 @@ globe.onFrame((ms) => {
   lastCluster = ms;
   renderClusters();
 });
+
+// ---- モバイル: パネルをボトムシートで開閉 --------------------------------
+const mLayersBtn = $("m-layers");
+const mDetailBtn = $("m-detail");
+const mBackdrop = $("m-backdrop");
+// $ のセレクタ版。方針は同じで、見つからなければ明示的に落とす
+const $sel = (sel: string): HTMLElement => {
+  const el = document.querySelector<HTMLElement>(sel);
+  if (!el) throw new Error(`必須要素が見つかりません: ${sel}`);
+  return el;
+};
+const leftPanel = $sel(".panel.left");
+const rightPanel = $sel(".panel.right");
+/** 開閉状態は見た目(active)だけでなく aria-pressed にも反映する（読み上げ対応） */
+function setTabState(btn: HTMLElement, open: boolean): void {
+  btn.classList.toggle("active", open);
+  btn.setAttribute("aria-pressed", String(open));
+}
+function closeSheets(): void {
+  leftPanel.classList.remove("open");
+  rightPanel.classList.remove("open");
+  mBackdrop.classList.remove("show");
+  setTabState(mLayersBtn, false);
+  setTabState(mDetailBtn, false);
+}
+function toggleSheet(which: "left" | "right"): void {
+  const panel = which === "left" ? leftPanel : rightPanel;
+  const btn = which === "left" ? mLayersBtn : mDetailBtn;
+  const wasOpen = panel.classList.contains("open");
+  closeSheets();
+  if (!wasOpen) { panel.classList.add("open"); setTabState(btn, true); mBackdrop.classList.add("show"); }
+}
+mLayersBtn.addEventListener("click", () => toggleSheet("left"));
+mDetailBtn.addEventListener("click", () => toggleSheet("right"));
+mBackdrop.addEventListener("click", closeSheets);
 
 // ---- 時間軸（潮流用。config を流用） ------------------------------------
 const STEP_MS = TIME_STEP_MIN * 60_000;

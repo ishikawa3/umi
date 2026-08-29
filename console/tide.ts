@@ -46,7 +46,7 @@ export class TideLayer {
     this.globe = globe;
     this.capacity = capacity;
 
-    const headGeo = new THREE.SphereGeometry(0.009, 10, 10);
+    const headGeo = new THREE.SphereGeometry(0.006, 10, 10);
     const headMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
     this.heads = new THREE.InstancedMesh(headGeo, headMat, capacity);
     this.heads.count = 0;
@@ -60,7 +60,7 @@ export class TideLayer {
     this.stems = new THREE.LineSegments(stemGeo, stemMat);
     this.stems.frustumCulled = false;
 
-    const haloGeo = new THREE.SphereGeometry(0.016, 16, 16);
+    const haloGeo = new THREE.SphereGeometry(0.012, 16, 16);
     const haloMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3, depthTest: false });
     this.halo = new THREE.Mesh(haloGeo, haloMat);
     this.halo.visible = false;
