@@ -15,12 +15,17 @@ const CACHE = PREFIX + "v1";
 const OFFLINE_URL = "./"; // start_url（/umi/console/）
 const PRECACHE = ["./", "./index.html", "./manifest.webmanifest", "./icons/kaisho-192.png", "./icons/kaisho-512.png"];
 
+// ビルド時に、このアプリのエントリJS/CSS（ハッシュ付き）が注入される。
+// 初回訪問では SW がまだページを制御しておらず、これらは CacheStorage に
+// 入らないため、precache に含めないとオフライン起動でアプリが動かない。
+const BUILD_ASSETS = [/* __PRECACHE_ASSETS__ */];
+
 self.addEventListener("install", (event) => {
   self.skipWaiting();
   // プリキャッシュの失敗は握りつぶさない。握りつぶすとシェル未取得のまま
   // インストール成功扱いになり、オフライン復帰が壊れていても気づけない。
   // ここで reject させればインストールが失敗し、次の読み込みで再試行される。
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(PRECACHE)));
+  event.waitUntil(caches.open(CACHE).then((c) => c.addAll([...PRECACHE, ...BUILD_ASSETS])));
 });
 
 self.addEventListener("activate", (event) => {
@@ -77,7 +82,13 @@ self.addEventListener("fetch", (event) => {
 // 例えば kaisho-v2 へ上げても umi-v1 に残る同一URLの古いコピーを返してしまい、
 // 世代更新が効かない。自分の CACHE だけを検索対象にする。
 function fromCache(req) {
-  return caches.open(CACHE).then((c) => c.match(req));
+  // ignoreVary が必要な理由: Vite はモジュールscriptに crossorigin を付けるため
+  // ページからのアセット要求は CORS モードになり Origin ヘッダを伴う。一方
+  // install の addAll は同一オリジン要求で Origin を送らない。配信側が
+  // Vary: Origin を返すと両者が別物とみなされ、precache 済みでも一致しない。
+  // ここで扱うのはハッシュ付きアセットとシェルだけで内容交渉はしないため、
+  // URL 一致で引く。
+  return caches.open(CACHE).then((c) => c.match(req, { ignoreVary: true }));
 }
 
 // waitUntil(undefined) が例外になるブラウザがあるため、常に Promise を返す
