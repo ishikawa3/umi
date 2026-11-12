@@ -156,21 +156,61 @@ export async function arcgisQuery(
   });
 }
 
-/** 等深線（20m/50m/100m/150m/200m 層）を海域bboxで取得 */
+/**
+ * v3 API（ArcGIS FeatureService）の汎用クエリ。1回あたり最大2000件で、
+ * 超える分は resultOffset で続きを取り、全件を返す。
+ * v2 は2027年12月末に提供終了予定（海しるAPI v3 リリースノート）。
+ * v3 に移行先がある項目はこちらを使う。サービス名は移行対応表の「移行先 v3 API」。
+ * 層番号・属性名は v2 と異なる（例: 海底地形名は v2 の 1/2/3 → v3 の 0/1/2、属性は小文字化）。
+ */
+export async function featureQueryAll(
+  service: string,
+  layer: number,
+  bbox: [number, number, number, number],
+  extra?: Record<string, string>,
+  onProgress?: (count: number) => void
+): Promise<any[]> {
+  const [xmin, ymin, xmax, ymax] = bbox;
+  const out: any[] = [];
+  for (let page = 0; page < 20; page++) {
+    const gj = await msilFetch(
+      `/arcgis/rest/services/FeatureService/v3/${service}/FeatureServer/${layer}/query`,
+      {
+        f: "geojson",
+        where: "1=1",
+        geometry: JSON.stringify({ xmin, ymin, xmax, ymax }),
+        geometryType: "esriGeometryEnvelope",
+        inSR: "4326",
+        outSR: "4326",
+        outFields: "*",
+        returnGeometry: "true",
+        resultOffset: String(out.length),
+        ...extra,
+      }
+    );
+    const fs: any[] = gj.features ?? [];
+    out.push(...fs);
+    onProgress?.(out.length);
+    // GeoJSON 出力では properties の下に入る
+    const exceeded = gj.exceededTransferLimit ?? gj.properties?.exceededTransferLimit;
+    if (!exceeded || fs.length === 0) break;
+  }
+  return out;
+}
+
+/** 等深線（20m/50m/100m/150m/200m）を海域bboxで取得（v3: 1層に depth 属性でまとまっている） */
 export async function fetchContours(bbox: [number, number, number, number]): Promise<ContourLine[]> {
-  const layers = [10, 11, 12, 13, 14];
-  const results = await Promise.allSettled(
-    layers.map((layer) => arcgisQuery("depth-contour/v2", layer, bbox, { outFields: "Depth" }))
-  );
+  const features = await featureQueryAll("depth_contour", 0, bbox, {
+    outFields: "depth",
+    where: "depth IN (20, 50, 100, 150, 200)",
+  });
   const lines: ContourLine[] = [];
-  for (const r of results) {
-    if (r.status !== "fulfilled" || !r.value.features) continue;
-    for (const f of r.value.features) {
-      const g = f.geometry;
-      const paths: [number, number][][] =
-        g.type === "MultiLineString" ? g.coordinates : [g.coordinates];
-      lines.push({ depth: f.properties.Depth, paths });
-    }
+  for (const f of features) {
+    const g = f.geometry;
+    if (!g) continue;
+    const paths: [number, number][][] =
+      g.type === "MultiLineString" ? g.coordinates : [g.coordinates];
+    lines.push({ depth: f.properties.depth, paths });
   }
   return lines;
 }

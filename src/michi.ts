@@ -15,8 +15,33 @@ const tooltip = document.getElementById("tooltip")!;
 
 const map = new JapanMap(canvas, JAPAN_BBOX);
 
-// 船舶通航量（AIS統計）の対象年。APIは年単位（2017–2020）でのみ提供。最新の確定年を使う。
-const YEAR = "2020";
+// 船舶通航量（AIS統計）の取得元。年単位の統計で、新しい順に試す。
+// - 2024年: 海しるAPI v3 の ArcGIS ImageService（2026/11 時点でベータ版）。
+//   公式のラスター関数 vessel_traffic_raster_template で、2020年版と同じ4色に色付けして書き出す
+// - 2020年: v2（2017–2020 のみ。2027年12月末に提供終了予定）。ベータ版が使えないときの控え
+interface TrafficSource {
+  year: string;
+  path: string;
+  params: Record<string, string>;
+}
+const SOURCES: TrafficSource[] = [
+  {
+    year: "2024",
+    path: "/arcgis/rest/services/ImageService/v3/vessel_traffic_2024/ImageServer/exportImage",
+    params: {
+      format: "png32",
+      renderingRule: JSON.stringify({ rasterFunction: "vessel_traffic_raster_template" }),
+      // 分類は色の一致で行うので、補間で中間色を作らせない
+      interpolation: "RSP_NearestNeighbor",
+    },
+  },
+  {
+    year: "2020",
+    path: "/monthly-vessel-traffic-amount/v2/2020/MapServer/export",
+    // 分類前提のロスレスなパレットPNGを固定する
+    params: { format: "png8", layers: "show:0" },
+  },
+];
 // 密度ラスタの取得解像度。JAPAN_BBOX の縦横比（経度26° × 緯度22°）に合わせる。
 const [BB_X0, BB_Y0, BB_X1, BB_Y1] = JAPAN_BBOX;
 const LON_SPAN = BB_X1 - BB_X0; // 26
@@ -125,30 +150,27 @@ let activeIdx: Int32Array | null = null;
  */
 const TILE_SPLIT = 3;
 
-async function loadTile(c0: number, c1: number, r0: number, r1: number): Promise<ImageBitmap> {
+async function loadTile(
+  src: TrafficSource, c0: number, c1: number, r0: number, r1: number
+): Promise<ImageBitmap> {
   const lon0 = BB_X0 + (c0 / RASTER_W) * LON_SPAN;
   const lon1 = BB_X0 + (c1 / RASTER_W) * LON_SPAN;
   const lat1 = BB_Y1 - (r0 / RASTER_H) * LAT_SPAN; // 行0が北端
   const lat0 = BB_Y1 - (r1 / RASTER_H) * LAT_SPAN;
   // 429リトライ・認証ヘッダ・非OK例外化を api.ts に集約（msilFetchRaw 経由）
-  const res = await msilFetchRaw(
-    `/monthly-vessel-traffic-amount/v2/${YEAR}/MapServer/export`,
-    {
-      bbox: `${lon0},${lat0},${lon1},${lat1}`,
-      // bbox を経緯度で解釈させ、分類前提のロスレスなパレットPNGを固定する
-      // （サーバのデフォルトSR/形式に依存しない。arcgisQuery の inSR:"4326" と同思想）
-      bboxSR: "4326",
-      imageSR: "4326",
-      format: "png8",
-      layers: "show:0",
-      size: `${c1 - c0},${r1 - r0}`,
-      f: "image",
-    }
-  );
+  const res = await msilFetchRaw(src.path, {
+    bbox: `${lon0},${lat0},${lon1},${lat1}`,
+    // bbox を経緯度で解釈させる（サーバのデフォルトSRに依存しない。arcgisQuery の inSR:"4326" と同思想）
+    bboxSR: "4326",
+    imageSR: "4326",
+    size: `${c1 - c0},${r1 - r0}`,
+    f: "image",
+    ...src.params,
+  });
   return createImageBitmap(await res.blob());
 }
 
-async function loadTraffic(): Promise<void> {
+async function loadTraffic(src: TrafficSource): Promise<void> {
   // オフスクリーンにタイルを並べてからピクセルを読む
   const off = document.createElement("canvas");
   off.width = RASTER_W;
@@ -163,8 +185,8 @@ async function loadTraffic(): Promise<void> {
     for (let j = 0; j < TILE_SPLIT; j++) {
       const [c0, c1, r0, r1] = [cols[i], cols[i + 1], rows[j], rows[j + 1]];
       jobs.push(
-        loadTile(c0, c1, r0, r1)
-          .catch(() => loadTile(c0, c1, r0, r1)) // 打ち切られたタイルを1回だけ取り直す
+        loadTile(src, c0, c1, r0, r1)
+          .catch(() => loadTile(src, c0, c1, r0, r1)) // 打ち切られたタイルを1回だけ取り直す
           .then((bmp) => {
             octx.drawImage(bmp, c0, r0, c1 - c0, r1 - r0);
             bmp.close(); // 描いたら不要。export 画像を早期に解放する
@@ -262,9 +284,19 @@ async function boot() {
   statusEl.textContent = "船舶通航量データ取得中…";
   try {
     await map.init();
-    await loadTraffic();
+    let year = "";
+    for (const src of SOURCES) {
+      try {
+        await loadTraffic(src);
+        year = src.year;
+        break;
+      } catch (e) {
+        console.warn(`[michi] ${src.year}年の通航量を取得できませんでした`, e);
+      }
+    }
+    if (!year) throw new Error("通航量を取得できませんでした");
     statusEl.textContent = "";
-    metaEl.textContent = `AIS統計 ${YEAR}年（海上保安庁）`;
+    metaEl.textContent = `AIS統計 ${year}年（海上保安庁）`;
     drawLegend();
     drawTraffic();
   } catch {

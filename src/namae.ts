@@ -1,5 +1,5 @@
 import "./style.css";
-import { arcgisQuery } from "./api";
+import { featureQueryAll } from "./api";
 import { JapanMap } from "./japanmap";
 import { mountNav } from "./nav";
 import { ambientLoop, type AmbientLoop } from "./motion";
@@ -11,7 +11,7 @@ mountNav("namae");
  * なまえ — 海の底につけられた名前（海上保安庁「海底地形名」）。
  *
  * 海山・海丘・海底谷の名前の多くは近くの地名に由来するが、
- * 一部は元号・二十四節気・星・七草・鳥など、ひとつの「系統」でまとめて名づけられている。
+ * 一部は元号・二十四節気・星・七草・鳥・人名など、ひとつの「系統」でまとめて名づけられている。
  * 地名由来のものは点として静かに置き、系統で名づけられた名前を縦書きで浮かび上がらせる。
  */
 
@@ -29,29 +29,29 @@ const NAMAE_BBOX: [number, number, number, number] = [122, 17, 160, 46];
 const map = new JapanMap(canvas, NAMAE_BBOX);
 
 // ---- 系統 ------------------------------------------------------------------
-// 「呼称の由来」は自由記述なので、キーワードでいくつかの系統に寄せる。
-// 先に地名由来を判定する（「近傍地名に由来（南鳥島）」を鳥の系統に入れないため）。
+// v3 の公式な「由来分類」（地理的名称・元号・鳥・七草・天文・人名…）で系統に分ける。
+// 値には末尾の空白・改行や "<NULL>" が混じるので整えてから判定する。
 interface Family {
   key: string;
   label: string;
   test: RegExp;
 }
 const FAMILIES: Family[] = [
-  // 船名を先に判定する（測量船「望星丸」を星の系統に入れないため）
+  { key: "gengo", label: "元号", test: /^元号/ },
+  { key: "koyomi", label: "暦・行事", test: /暦|節気|行事|祭|曜日/ }, // 陰暦の月名・七曜も暦の仲間
+  { key: "tenmon", label: "天文", test: /^天文/ }, // 星・月・惑星
+  { key: "kusaki", label: "草木", test: /七草|草木/ },
+  { key: "tori", label: "鳥", test: /^鳥/ },
+  { key: "hito", label: "人", test: /^人名/ }, // 海洋学者・作家・船長
   { key: "fune", label: "船", test: /船/ },
-  { key: "gengo", label: "元号", test: /元号/ },
-  { key: "koyomi", label: "節気・行事", test: /節気|雑節|行事|祭/ },
-  { key: "tsuki", label: "月", test: /陰暦|月の名/ },
-  { key: "hoshi", label: "星", test: /星/ },
-  { key: "kusaki", label: "草木", test: /七草|木々/ },
-  { key: "tori", label: "鳥", test: /鳥/ },
 ];
 const OTHER: Family = { key: "hoka", label: "そのほか", test: /./ };
-const PLACE = /^(近傍|地元)/;
+/** 地名に由来するもの・由来不明は系統に入れない（点として置く） */
+const PLACE = /^(地理的名称|地元慣習名|近傍地名|不明|<NULL>)?$/;
 
-function familyOf(origin: string): Family | null {
-  if (!origin || PLACE.test(origin)) return null;
-  return FAMILIES.find((f) => f.test.test(origin)) ?? OTHER;
+function familyOf(category: string): Family | null {
+  if (PLACE.test(category)) return null;
+  return FAMILIES.find((f) => f.test.test(category)) ?? OTHER;
 }
 
 // ---- データ ----------------------------------------------------------------
@@ -112,32 +112,25 @@ function shapeOf(g: any): number[][][] | null {
   return null;
 }
 
+/** v3: 層0=点・1=線（海底谷など）・2=面（海山など） */
 async function fetchLayer(layer: number): Promise<Feature[]> {
   const out: Feature[] = [];
-  for (let page = 0; page < 5; page++) {
-    const gj = await arcgisQuery("undersea-features/v2", layer, NAMAE_BBOX, {
-      resultOffset: String(page * 1000),
+  for (const f of await featureQueryAll("undersea_feature_name", layer, NAMAE_BBOX)) {
+    const p = f.properties ?? {};
+    const pos = representative(f.geometry);
+    if (!pos) continue;
+    out.push({
+      name: String(p["海底地形名"] ?? ""),
+      kana: String(p["かな"] ?? ""),
+      generic: String(p["属名"] ?? ""),
+      origin: String(p["呼称の由来"] ?? "").trim(),
+      depth: parseDepth(p["水深"]),
+      year: typeof p.jcufn_approved === "number" ? p.jcufn_approved : null,
+      lon: pos[0],
+      lat: pos[1],
+      family: familyOf(String(p["由来分類"] ?? "").trim()),
+      shape: shapeOf(f.geometry),
     });
-    for (const f of gj.features ?? []) {
-      const p = f.properties ?? {};
-      const pos = representative(f.geometry);
-      if (!pos) continue;
-      const origin = String(p["呼称の由来"] ?? "").trim();
-      out.push({
-        name: String(p["海底地形名"] ?? ""),
-        kana: String(p["かな"] ?? ""),
-        generic: String(p["属名"] ?? ""),
-        origin,
-        depth: parseDepth(p["水深"]),
-        year: typeof p.JCUFN_approved === "number" ? p.JCUFN_approved : null,
-        lon: pos[0],
-        lat: pos[1],
-        family: familyOf(origin),
-        shape: shapeOf(f.geometry),
-      });
-    }
-    const exceeded = gj.exceededTransferLimit ?? gj.properties?.exceededTransferLimit;
-    if (!exceeded) break;
   }
   return out;
 }
@@ -396,7 +389,7 @@ async function boot() {
   statusEl.textContent = "海の底の名前を集めています…";
   try {
     const [layers] = await Promise.all([
-      Promise.all([1, 2, 3].map((l) => fetchLayer(l))),
+      Promise.all([0, 1, 2].map((l) => fetchLayer(l))),
       map.init(),
     ]);
     features = layers.flat().filter((f) => f.name);

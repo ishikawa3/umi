@@ -1,5 +1,5 @@
 import "./style.css";
-import { arcgisQuery } from "./api";
+import { featureQueryAll } from "./api";
 import { JapanMap, JAPAN_BBOX } from "./japanmap";
 import { mountNav } from "./nav";
 import { ambientLoop, type AmbientLoop } from "./motion";
@@ -23,24 +23,18 @@ let wrecks: Wreck[] = [];
 
 /** 沈船は属性を持たない（位置だけが残っている）。全ページ取得する */
 async function fetchWrecks(): Promise<Wreck[]> {
-  const out: Wreck[] = [];
-  for (let page = 0; page < 10; page++) {
-    const gj = await arcgisQuery("wrecks/v2", 1, JAPAN_BBOX, {
-      outFields: "OBJECTID",
-      resultOffset: String(page * 1000),
-    });
-    for (const f of gj.features ?? []) {
-      out.push({
-        lon: f.geometry.coordinates[0],
-        lat: f.geometry.coordinates[1],
-        seed: Math.random() * Math.PI * 2,
-        slow: 0.6 + Math.random() * 0.8,
-      });
-    }
-    statusEl.textContent = `沈船の位置を集めています… ${out.length}`;
-    if (!gj.exceededTransferLimit) break;
-  }
-  return out;
+  // v3: 沈船は点が層20（層1は面）
+  const features = await featureQueryAll("wreck", 20, JAPAN_BBOX, { outFields: "objectid" }, (n) => {
+    statusEl.textContent = `沈船の位置を集めています… ${n}`;
+  });
+  return features
+    .filter((f) => f.geometry?.type === "Point")
+    .map((f) => ({
+      lon: f.geometry.coordinates[0],
+      lat: f.geometry.coordinates[1],
+      seed: Math.random() * Math.PI * 2,
+      slow: 0.6 + Math.random() * 0.8,
+    }));
 }
 
 let loop: AmbientLoop | null = null;

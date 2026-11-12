@@ -1,5 +1,5 @@
 import "./style.css";
-import { arcgisQuery } from "./api";
+import { featureQueryAll } from "./api";
 import { JapanMap, JAPAN_BBOX } from "./japanmap";
 import { mountNav } from "./nav";
 import { ambientLoop } from "./motion";
@@ -32,25 +32,19 @@ let cableCount = 0; // 経路（フィーチャ）数
 let screenPaths: ScreenPath[] = [];
 let particles: Particle[] = [];
 
-/** 海底ケーブル（layer 2 = polyline）を全ページ取得する。属性は OBJECTID のみ（名称なし）。 */
+/** 海底ケーブル（v3: 層0 = 線、層1 は区域の面）を全件取得する。属性は objectid のみ（名称なし）。 */
 async function fetchCables(): Promise<{ lines: [number, number][][]; count: number }> {
+  const features = await featureQueryAll("submarine_cable", 0, JAPAN_BBOX, { outFields: "objectid" }, (n) => {
+    statusEl.textContent = `海底ケーブルを集めています… ${n}`;
+  });
   const lines: [number, number][][] = [];
   let count = 0;
-  for (let page = 0; page < 8; page++) {
-    const gj = await arcgisQuery("submarine-cable-line/v2", 2, JAPAN_BBOX, {
-      outFields: "OBJECTID",
-      resultOffset: String(page * 1000),
-    });
-    const fs: any[] = gj.features ?? [];
-    for (const f of fs) {
-      const g = f.geometry;
-      if (!g) continue;
-      count++;
-      if (g.type === "LineString") lines.push(g.coordinates);
-      else if (g.type === "MultiLineString") lines.push(...g.coordinates);
-    }
-    statusEl.textContent = `海底ケーブルを集めています… ${count}`;
-    if (!gj.exceededTransferLimit) break;
+  for (const f of features) {
+    const g = f.geometry;
+    if (!g) continue;
+    count++;
+    if (g.type === "LineString") lines.push(g.coordinates);
+    else if (g.type === "MultiLineString") lines.push(...g.coordinates);
   }
   return { lines, count };
 }

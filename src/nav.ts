@@ -6,7 +6,7 @@ const PAGES = [
   { id: "shiodoki", title: "しおどき", href: "./tide.html",  desc: "潮汐" },
   { id: "koe",      title: "こえ",     href: "./koe.html",   desc: "警報" },
   { id: "nemuri",   title: "ねむり",   href: "./nemuri.html", desc: "沈船" },
-  { id: "nami",     title: "なみ",     href: "./nami.html",  desc: "波浪" },
+  // なみ（波浪）は海しるの波浪データの提供が止まったためナビから外した（ページは残す）
   { id: "michi",    title: "みち",     href: "./michi.html", desc: "航路" },
   { id: "koori",    title: "こおり",   href: "./koori.html", desc: "海氷" },
   { id: "suji",     title: "すじ",     href: "./suji.html",  desc: "海底ケーブル" },
