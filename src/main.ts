@@ -57,7 +57,8 @@ const fmtJst = (d: Date) => {
 // ---- 状態 ------------------------------------------------------------
 let areas: Area[] = [];
 let currentArea: Area | null = null;
-let playing = true;
+// 動きを減らす設定・停止中は一時停止から始める（しおどきと同じ）
+let playing = motionAllowed();
 /** 再生ヘッド（step単位・小数）。整数間を補間して描く */
 let head = Number(timeSlider.value);
 const fieldCache = new Map<string, VectorField>();
@@ -133,12 +134,16 @@ function updateLegend() {
 }
 
 // ---- 海域切替 --------------------------------------------------------
-const maskCache = new Map<string, LandMask | null>();
-async function loadMask(area: Area): Promise<LandMask | null> {
-  if (maskCache.has(area.code)) return maskCache.get(area.code)!;
-  const mask = await buildLandMask(area.bbox);
-  maskCache.set(area.code, mask);
-  return mask;
+// 生成中の Promise ごと保持する。マスク生成は途中で処理を譲るので、
+// 生成中に同じ海域が再度選ばれても二重に作らない（buildLandMask は失敗時も null で解決する）
+const maskCache = new Map<string, Promise<LandMask | null>>();
+function loadMask(area: Area): Promise<LandMask | null> {
+  let p = maskCache.get(area.code);
+  if (!p) {
+    p = buildLandMask(area.bbox);
+    maskCache.set(area.code, p);
+  }
+  return p;
 }
 
 async function selectArea(area: Area) {
@@ -172,10 +177,14 @@ timeSlider.addEventListener("input", () => {
   void applyHead();
 });
 
-function togglePlay() {
-  playing = !playing;
+function syncPlayBtn() {
   playBtn.textContent = playing ? "❚❚" : "▶";
   playBtn.setAttribute("aria-label", playing ? "一時停止" : "再生");
+}
+syncPlayBtn();
+function togglePlay() {
+  playing = !playing;
+  syncPlayBtn();
 }
 
 playBtn.addEventListener("click", togglePlay);
@@ -239,6 +248,10 @@ window.addEventListener("keydown", (ev) => {
   // テキスト入力中は無視
   const tag = (ev.target as Element)?.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA") return;
+  // ドロワー（モーダル）表示中は背面を操作しない
+  if (drawerEl.open) return;
+  // ボタン・リンク上の Space は押下そのもの（チップ選択・「とめる」等）に使わせる
+  if (ev.key === " " && (tag === "BUTTON" || tag === "A")) return;
   if (ev.key === " ") {
     ev.preventDefault();
     togglePlay();
@@ -295,6 +308,15 @@ function still() {
   renderer.setReducedMotion(true);
   renderer.frame(0);
 }
+// 静止表示中の再生: 粒子は動かさず、30分刻みのコマを約10秒ごとに進める
+// （アニメーション中と同じ速さ。「とめる」は動きを止めるもので、時刻の再生とは別）
+setInterval(() => {
+  if (!playing || !currentArea || !loop || loop.running) return;
+  head = Math.floor(head) + 1;
+  if (head > steps) head = 0;
+  timeSlider.value = String(head);
+  void applyHead();
+}, 10_000);
 // ---- 起動 ------------------------------------------------------------
 async function boot() {
   statusEl.textContent = "海域一覧を取得中…";
