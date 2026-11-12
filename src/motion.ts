@@ -39,7 +39,7 @@ export function motionAllowed(): boolean {
 }
 
 export interface AmbientLoop {
-  /** 止まっているときに1枚だけ描き直す（リサイズ・ハイライト変更など） */
+  /** 止まっているときに次のフレームで1枚だけ描き直す（リサイズ・ハイライト変更など。連続呼び出しはまとめる） */
   redraw(): void;
   readonly running: boolean;
 }
@@ -109,9 +109,16 @@ export function ambientLoop(
 
   apply();
 
+  // 静止中の描き直しは1フレームにまとめる（リサイズやホバーで連続して呼ばれても、
+  // 全面の静止図を何十回も同期で描かない）
+  let stillRaf = 0;
   return {
     redraw() {
-      if (!running) drawStill();
+      if (running || stillRaf) return;
+      stillRaf = requestAnimationFrame(() => {
+        stillRaf = 0;
+        if (!running) drawStill();
+      });
     },
     get running() {
       return running;

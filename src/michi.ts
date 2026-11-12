@@ -2,7 +2,7 @@ import "./style.css";
 import { JapanMap, JAPAN_BBOX } from "./japanmap";
 import { speedColor } from "./render";
 import { mountNav } from "./nav";
-import { msilFetchRaw } from "./api";
+import { msilFetchRaw, MsilHttpError } from "./api";
 
 mountNav("michi");
 
@@ -144,8 +144,10 @@ let activeIdx: Int32Array | null = null;
  * 全域を1枚（1400px）で export させると海しる側の描画に約40秒かかり、
  * 約30秒で中継側に打ち切られる（CORSヘッダの無いエラーになり、ブラウザでは取得失敗）。
  * 3×3 に分けて並行に取る（1枚あたり数秒）。それでも描画時間にはばらつきがあり、
- * まれに1枚だけ打ち切られるので、打ち切り（ブラウザでは CORS 失敗＝TypeError に見える）と
- * 5xx のタイルだけ1回取り直す。4xx などの直らない失敗は取り直さず、すぐ次の取得元へ移る。
+ * まれに1枚だけ打ち切られるので、中継の打ち切りと 5xx のタイルだけ1回取り直す。
+ * 打ち切りも、CORS ヘッダの無い 4xx（海しるの 404 等）も、ブラウザからは同じ TypeError に見える。
+ * 打ち切りは約30秒待たされてから起きるので、時間のかかった TypeError だけを打ち切りとみなす。
+ * すぐに失敗したもの（直らない 4xx・オフライン）は取り直さず、すぐ次の取得元へ移る。
  * 画像は経緯度座標系（imageSR=4326）なので、ピクセル境界から各タイルの bbox を
  * 線形に求めれば継ぎ目なくつながる。
  */
@@ -171,11 +173,14 @@ async function loadTile(
   return createImageBitmap(await res.blob());
 }
 
-/** 取り直す価値のある失敗か（中継の打ち切り・ネットワーク断・5xx） */
-function retryable(e: unknown, signal: AbortSignal): boolean {
+/** 中継の打ち切りとみなす経過時間（打ち切りは約30秒後に起きる） */
+const CUTOFF_LIKE_MS = 15_000;
+
+/** 取り直す価値のある失敗か（中継の打ち切り・5xx） */
+function retryable(e: unknown, signal: AbortSignal, elapsedMs: number): boolean {
   if (signal.aborted) return false;
-  if (e instanceof TypeError) return true;
-  return /MSIL API 5\d\d/.test(String(e));
+  if (e instanceof MsilHttpError) return e.status >= 500;
+  return e instanceof TypeError && elapsedMs >= CUTOFF_LIKE_MS;
 }
 
 async function loadTraffic(src: TrafficSource): Promise<void> {
@@ -196,10 +201,11 @@ async function loadTraffic(src: TrafficSource): Promise<void> {
   for (let i = 0; i < TILE_SPLIT; i++) {
     for (let j = 0; j < TILE_SPLIT; j++) {
       const [c0, c1, r0, r1] = [cols[i], cols[i + 1], rows[j], rows[j + 1]];
+      const t0 = performance.now();
       jobs.push(
         loadTile(src, c0, c1, r0, r1, signal)
           .catch((e) => {
-            if (!retryable(e, signal)) throw e;
+            if (!retryable(e, signal, performance.now() - t0)) throw e;
             return loadTile(src, c0, c1, r0, r1, signal); // 1回だけ取り直す
           })
           .then((bmp) => {

@@ -22,6 +22,14 @@ export interface ContourLine {
   paths: [number, number][][];
 }
 
+/** 海しるAPIが非OKのHTTPステータスを返した（CORSヘッダ付きで応答が読めた場合） */
+export class MsilHttpError extends Error {
+  constructor(readonly status: number, url: URL) {
+    super(`MSIL API ${status}: ${url}`);
+    this.name = "MsilHttpError";
+  }
+}
+
 /**
  * 海しるAPIへの生アクセス。429を指数バックオフでリトライし、非OKは例外化する。
  * バイナリ（画像export等）を扱うページはこの Response を直接使う。
@@ -43,7 +51,7 @@ export async function msilFetchRaw(
       continue;
     }
     // 認証キーはヘッダ送信でURLに含まれないため、クエリ込みのURLを出して追跡性を上げる
-    if (!res.ok) throw new Error(`MSIL API ${res.status}: ${url}`);
+    if (!res.ok) throw new MsilHttpError(res.status, url);
     return res;
   }
 }
@@ -211,19 +219,27 @@ export async function featureQueryAll(
   throw new Error(`featureQueryAll: ${service}/${layer} が ${MAX_PAGES} ページを超えました`);
 }
 
-/** 等深線（20m/50m/100m/150m/200m）を海域bboxで取得（v3: 1層に depth 属性でまとまっている） */
+/**
+ * 等深線（20m/50m/100m/150m/200m）を海域bboxで取得（v3: 1層に depth 属性でまとまっている）。
+ * 深さごとに別々に取り、取れなかった深さだけを欠かす（1回の失敗で全部の等深線を失わない。v2 の層ごと取得と同じ）
+ */
+const CONTOUR_DEPTHS = [20, 50, 100, 150, 200];
 export async function fetchContours(bbox: [number, number, number, number]): Promise<ContourLine[]> {
-  const features = await featureQueryAll("depth_contour", 0, bbox, {
-    outFields: "depth",
-    where: "depth IN (20, 50, 100, 150, 200)",
-  });
+  const results = await Promise.allSettled(
+    CONTOUR_DEPTHS.map((d) =>
+      featureQueryAll("depth_contour", 0, bbox, { outFields: "depth", where: `depth = ${d}` })
+    )
+  );
   const lines: ContourLine[] = [];
-  for (const f of features) {
-    const g = f.geometry;
-    if (!g) continue;
-    const paths: [number, number][][] =
-      g.type === "MultiLineString" ? g.coordinates : [g.coordinates];
-    lines.push({ depth: f.properties.depth, paths });
+  for (const r of results) {
+    if (r.status !== "fulfilled") continue;
+    for (const f of r.value) {
+      const g = f.geometry;
+      if (!g) continue;
+      const paths: [number, number][][] =
+        g.type === "MultiLineString" ? g.coordinates : [g.coordinates];
+      lines.push({ depth: f.properties.depth, paths });
+    }
   }
   return lines;
 }

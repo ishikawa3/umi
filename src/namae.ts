@@ -74,11 +74,12 @@ let named: Feature[] = []; // 系統で名づけられたもの
 let active: Family | null = null; // null = すべての系統
 let hovered: Feature | null = null;
 
-/** 水深は数値か "100m-1100m" のような文字列。範囲なら深い側をとる */
+/** 水深は数値か "100m-1100m"・"3,872m" のような文字列。範囲なら深い側をとる */
 function parseDepth(v: unknown): number | null {
   if (typeof v === "number") return Number.isFinite(v) ? v : null;
   if (typeof v !== "string") return null;
-  const nums = v.match(/\d+(?:\.\d+)?/g)?.map(Number) ?? [];
+  // 桁区切りのカンマを先に除く（"3,872m" を 3 と 872 に分けて 872m と読まないように）
+  const nums = v.replace(/[,，]/g, "").match(/\d+(?:\.\d+)?/g)?.map(Number) ?? [];
   return nums.length ? Math.max(...nums) : null;
 }
 
@@ -212,22 +213,46 @@ function surfaceAlpha(t: number): number {
   return Math.max(0, 1 - (t - FADE_IN - HOLD) / FADE_OUT);
 }
 
-/** 系統を選んだときだけ、その一族の名前をすべて灯す（すべてを並べると南の海で重なって読めない） */
-function drawNames(ctx: CanvasRenderingContext2D, ts: number, animate: boolean) {
-  if (!active) return;
+/** 配置済みの名前（系統と画面サイズが同じあいだは使い回す） */
+interface PlacedName {
+  f: Feature;
+  x: number;
+  top: number;
+}
+let layoutKey = "";
+let layout: PlacedName[] = [];
+
+/**
+ * 系統の名前の配置。密集した海山列では名前どうしが重なるので、先に置いた名前とぶつかるものは省く
+ * （点は背景に残っており、ホバーで読める）。重なり判定は名前数の2乗なので、
+ * 毎フレームではなく系統か画面サイズが変わったときだけ計算する。
+ */
+function namesLayout(): PlacedName[] {
+  const key = `${active?.key ?? ""}:${canvas.width}x${canvas.height}`;
+  if (key === layoutKey) return layout;
   const dpr = map.dpr;
   const size = 11 * dpr;
-  // 密集した海山列では名前どうしが重なるので、先に置いた名前とぶつかるものは省く
-  // （点は背景に残っており、ホバーで読める）
-  const placed: [number, number, number, number][] = [];
+  const boxes: [number, number, number, number][] = [];
+  layout = [];
   for (const f of visibleNamed()) {
     const [x, y] = map.toScreen(f.lon, f.lat);
     const len = [...f.name].length * size * 1.12;
     // 画面の下端からはみ出すときは点の上側へ書く
     const top = y + 4 * dpr + len > canvas.height - 24 * dpr ? y - 4 * dpr - len : y + 4 * dpr;
     const box: [number, number, number, number] = [x - size * 0.6, top, x + size * 0.6, top + len];
-    if (placed.some((b) => box[0] < b[2] && box[2] > b[0] && box[1] < b[3] && box[3] > b[1])) continue;
-    placed.push(box);
+    if (boxes.some((b) => box[0] < b[2] && box[2] > b[0] && box[1] < b[3] && box[3] > b[1])) continue;
+    boxes.push(box);
+    layout.push({ f, x, top });
+  }
+  layoutKey = key;
+  return layout;
+}
+
+/** 系統を選んだときだけ、その一族の名前をすべて灯す（すべてを並べると南の海で重なって読めない） */
+function drawNames(ctx: CanvasRenderingContext2D, ts: number, animate: boolean) {
+  if (!active) return;
+  const size = 11 * map.dpr;
+  for (const { f, x, top } of namesLayout()) {
     const breath = animate ? 0.5 + 0.5 * Math.sin(ts / 2600 + f.lon * 3.1 + f.lat) : 0.5;
     ctx.fillStyle = `rgba(127, 227, 224, ${0.55 + breath * 0.25})`;
     drawVertical(ctx, f.name, x, top, size);
@@ -265,7 +290,8 @@ function frame(ts: number, dt: number) {
   const ctx = map.ctx;
   if (base) ctx.drawImage(base, 0, 0);
   else map.drawBase();
-  const animate = dt > 0;
+  // dt では判定しない（再開直後の1フレームは dt=0 に丸められ、浮かぶ名前が一瞬消えてしまう）
+  const animate = loop?.running ?? false;
 
   if (animate) {
     // 数秒おきに、系統の名前をひとつ大きく浮かび上がらせる
@@ -291,24 +317,34 @@ function frame(ts: number, dt: number) {
 let loop: AmbientLoop | null = null;
 const redraw = () => loop?.redraw();
 
+/** チップは一度だけ作り、押されたら状態だけ切り替える（作り直すとキーボードのフォーカスが失われる） */
+const chipButtons = new Map<Family | null, HTMLButtonElement>();
+function syncChips() {
+  for (const [fam, b] of chipButtons) {
+    b.classList.toggle("active", active === fam);
+    b.setAttribute("aria-pressed", String(active === fam));
+  }
+}
+
 function buildChips() {
   chipsEl.textContent = "";
+  chipButtons.clear();
   const counts = new Map<Family, number>();
   for (const f of named) counts.set(f.family!, (counts.get(f.family!) ?? 0) + 1);
   const make = (label: string, fam: Family | null) => {
     const b = document.createElement("button");
     b.type = "button";
-    b.className = "filter-chip" + (active === fam ? " active" : "");
+    b.className = "filter-chip";
     b.textContent = label;
-    b.setAttribute("aria-pressed", String(active === fam));
     b.addEventListener("click", () => {
       active = active === fam ? null : fam;
       surfacing.length = 0;
       nextSurface = 0.3;
-      buildChips();
+      syncChips();
       updateCount();
       redraw();
     });
+    chipButtons.set(fam, b);
     chipsEl.appendChild(b);
   };
   make(`すべて ${named.length}`, null);
@@ -316,6 +352,7 @@ function buildChips() {
     const n = counts.get(fam);
     if (n) make(`${fam.label} ${n}`, fam);
   }
+  syncChips();
 }
 
 function drawLegend() {
