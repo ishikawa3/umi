@@ -496,6 +496,17 @@ html, body { height: 100%; overflow: hidden; background: #04070f; }
   border-color: var(--chip-color, var(--accent));
 }
 
+/* なまえ: スマホでは系統チップをタイトルの下へ（右上だとタイトルと重なる） */
+@media (max-width: 720px) {
+  #family-chips {
+    top: 11rem;
+    left: 1.2rem;
+    right: 1.2rem;
+    max-width: none;
+    justify-content: flex-start;
+  }
+}
+
 /* --- E-2: ナビ hover ツールチップ --- */
 .hud-nav a[data-desc]::after {
   content: attr(data-desc);

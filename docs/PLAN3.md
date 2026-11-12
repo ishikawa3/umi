@@ -60,6 +60,17 @@ maps.gsi.go.jp
 - `api.ts` — `msilFetch`（429リトライ内蔵・**必ず経由**）、`arcgisQuery(path, layer, bbox, extra?)`、
   `toMsilTime` / `toMsilDate`（JST変換）
 
+### 2026年11月の確認結果（管理APIの一覧 233件・ArcGIS Feature/ImageService の識別子一覧）
+
+- **海面水温・海上風・領海/EEZ のデータ層は見つからない**（`水温 [リンク]` はリンク集のみ。
+  `quick-bulletin` の層は流軸 6〜9 のみ）。→ フェーズ8 みなも・9 かぜ・13 さかい は実装を見送り
+- **`wave-analysis/v2`（なみ）は一覧から消え、404 を返す**。なみは現在データを表示できない
+- `monthly-vessel-traffic-amount/v2` の export は全域1400pxだと描画に約40秒かかり、約30秒で
+  打ち切られる（CORSヘッダ無しのエラーになる）。みちは 3×3 タイルに分けて取得している。
+  なお ImageService（ベータ）に `vessel_traffic_2024` がある
+- 代わりの新作として `undersea-features/v2`（海底地形名。点1/線2/面3、`呼称の由来` 付き）で
+  **なまえ** を追加した
+
 ---
 
 ## フェーズ8: みなも — 海の体温（海面水温）★signature

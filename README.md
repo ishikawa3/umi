@@ -11,9 +11,12 @@
 | [くろしお](https://ishikawa3.github.io/umi/kuroshio.html) | 黒潮・対馬暖流・宗谷暖流の流軸を流れる光 | 海洋速報 v2 |
 | [しおどき](https://ishikawa3.github.io/umi/tide.html) | 全国の検潮所が潮位で明滅する「呼吸する日本地図」＋潮位曲線 | 潮汐推算 v3 |
 | [こえ](https://ishikawa3.github.io/umi/koe.html) | 航行警報 — いま海で起きていることば | 航行警報 v2 |
+| [ねむり](https://ishikawa3.github.io/umi/nemuri.html) | 日本の海に眠る名もなき沈船を、ゆっくり明滅する星図に | 沈船 v2 |
+| [なみ](https://ishikawa3.github.io/umi/nami.html) | 有義波高と波向きの点描 ※海しるの波浪データ（wave-analysis）の提供が止まっており、現在は表示されない | 波浪 v2 |
 | [みち](https://ishikawa3.github.io/umi/michi.html) | 船舶通航量（AIS）を単一色相の航路の光として。主要港・海峡が動脈のように灯る | 船舶通航量 v2 |
 | [こおり](https://ishikawa3.github.io/umi/koori.html) | オホーツク海・北海道沖の海氷を白で。オフシーズンは「凍っていない」ことを静かに語る | 海氷 v2 |
 | [すじ](https://ishikawa3.github.io/umi/suji.html) | 日本近海の海底ケーブル経路を、微光が流れる海の神経として | 海底ケーブル v2 |
+| [なまえ](https://ishikawa3.github.io/umi/namae.html) | 海の底につけられた名前。元号・節気・星・草木・鳥などの系統で名づけられた海山の名が、縦書きで浮かび上がる | 海底地形名 v2 |
 
 同じ海しるデータを、この詩的な作品群とは真逆の「業務システム風」に見せる別サイト
 [**かいしょう / VTS Console**](https://ishikawa3.github.io/umi/console/)（three.js/WebGL の3D海図）もあります。

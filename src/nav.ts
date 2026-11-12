@@ -10,6 +10,7 @@ const PAGES = [
   { id: "michi",    title: "みち",     href: "./michi.html", desc: "航路" },
   { id: "koori",    title: "こおり",   href: "./koori.html", desc: "海氷" },
   { id: "suji",     title: "すじ",     href: "./suji.html",  desc: "海底ケーブル" },
+  { id: "namae",    title: "なまえ",   href: "./namae.html", desc: "海底地形名" },
 ];
 
 export function mountNav(current: string) {

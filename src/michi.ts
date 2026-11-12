@@ -115,33 +115,65 @@ let grid: Uint8Array | null = null;
 // 非0（描画対象）画素のインデックス一覧。描画を O(非0画素数) にするため。
 let activeIdx: Int32Array | null = null;
 
-async function loadTraffic(): Promise<void> {
+/**
+ * 全域を1枚（1400px）で export させると海しる側の描画に約40秒かかり、
+ * 約30秒で中継側に打ち切られる（CORSヘッダの無いエラーになり、ブラウザでは取得失敗）。
+ * 3×3 に分けて並行に取る（1枚あたり数秒）。それでも描画時間にはばらつきがあり、
+ * まれに1枚だけ打ち切られるので、失敗したタイルは1回だけ取り直す。
+ * 画像は経緯度座標系（imageSR=4326）なので、ピクセル境界から各タイルの bbox を
+ * 線形に求めれば継ぎ目なくつながる。
+ */
+const TILE_SPLIT = 3;
+
+async function loadTile(c0: number, c1: number, r0: number, r1: number): Promise<ImageBitmap> {
+  const lon0 = BB_X0 + (c0 / RASTER_W) * LON_SPAN;
+  const lon1 = BB_X0 + (c1 / RASTER_W) * LON_SPAN;
+  const lat1 = BB_Y1 - (r0 / RASTER_H) * LAT_SPAN; // 行0が北端
+  const lat0 = BB_Y1 - (r1 / RASTER_H) * LAT_SPAN;
   // 429リトライ・認証ヘッダ・非OK例外化を api.ts に集約（msilFetchRaw 経由）
   const res = await msilFetchRaw(
     `/monthly-vessel-traffic-amount/v2/${YEAR}/MapServer/export`,
     {
-      bbox: `${BB_X0},${BB_Y0},${BB_X1},${BB_Y1}`,
+      bbox: `${lon0},${lat0},${lon1},${lat1}`,
       // bbox を経緯度で解釈させ、分類前提のロスレスなパレットPNGを固定する
       // （サーバのデフォルトSR/形式に依存しない。arcgisQuery の inSR:"4326" と同思想）
       bboxSR: "4326",
       imageSR: "4326",
       format: "png8",
       layers: "show:0",
-      size: `${RASTER_W},${RASTER_H}`,
+      size: `${c1 - c0},${r1 - r0}`,
       f: "image",
     }
   );
-  const blob = await res.blob();
-  const bmp = await createImageBitmap(blob);
+  return createImageBitmap(await res.blob());
+}
 
-  // オフスクリーンに描いてピクセルを読む
+async function loadTraffic(): Promise<void> {
+  // オフスクリーンにタイルを並べてからピクセルを読む
   const off = document.createElement("canvas");
   off.width = RASTER_W;
   off.height = RASTER_H;
   const octx = off.getContext("2d", { willReadFrequently: true })!;
-  octx.drawImage(bmp, 0, 0, RASTER_W, RASTER_H);
+  const cuts = (n: number) =>
+    Array.from({ length: TILE_SPLIT + 1 }, (_, i) => Math.round((n * i) / TILE_SPLIT));
+  const cols = cuts(RASTER_W);
+  const rows = cuts(RASTER_H);
+  const jobs: Promise<void>[] = [];
+  for (let i = 0; i < TILE_SPLIT; i++) {
+    for (let j = 0; j < TILE_SPLIT; j++) {
+      const [c0, c1, r0, r1] = [cols[i], cols[i + 1], rows[j], rows[j + 1]];
+      jobs.push(
+        loadTile(c0, c1, r0, r1)
+          .catch(() => loadTile(c0, c1, r0, r1)) // 打ち切られたタイルを1回だけ取り直す
+          .then((bmp) => {
+            octx.drawImage(bmp, c0, r0, c1 - c0, r1 - r0);
+            bmp.close(); // 描いたら不要。export 画像を早期に解放する
+          })
+      );
+    }
+  }
+  await Promise.all(jobs);
   const data = octx.getImageData(0, 0, RASTER_W, RASTER_H).data;
-  bmp.close(); // ピクセル取得後は不要。大きめの export 画像を早期に解放する。
 
   const g = new Uint8Array(RASTER_W * RASTER_H);
   const active: number[] = [];
