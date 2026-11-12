@@ -2,6 +2,7 @@ import "./style.css";
 import { arcgisQuery } from "./api";
 import { JapanMap, JAPAN_BBOX } from "./japanmap";
 import { mountNav } from "./nav";
+import { ambientLoop, type AmbientLoop } from "./motion";
 
 mountNav("nemuri");
 
@@ -42,7 +43,9 @@ async function fetchWrecks(): Promise<Wreck[]> {
   return out;
 }
 
-function tick(ts: number) {
+let loop: AmbientLoop | null = null;
+
+function frame(ts: number) {
   map.drawBase();
   const ctx = map.ctx;
   ctx.globalCompositeOperation = "lighter";
@@ -57,10 +60,12 @@ function tick(ts: number) {
     ctx.fill();
   }
   ctx.globalCompositeOperation = "source-over";
-  requestAnimationFrame(tick);
 }
 
-window.addEventListener("resize", () => map.resize());
+window.addEventListener("resize", () => {
+  map.resize();
+  loop?.redraw();
+});
 
 async function boot() {
   statusEl.textContent = "沈船の位置を集めています…";
@@ -73,7 +78,7 @@ async function boot() {
   }
   statusEl.textContent = "";
   countEl.textContent = `日本の海に眠る沈船 ${wrecks.length.toLocaleString()}隻`;
-  requestAnimationFrame(tick);
+  loop = ambientLoop(frame);
 }
 
 void boot();

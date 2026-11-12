@@ -6,6 +6,7 @@ import {
 import { VectorField } from "./field";
 import { buildLandMask, type LandMask } from "./landmask";
 import { mountNav } from "./nav";
+import { ambientLoop, motionAllowed, type AmbientLoop } from "./motion";
 
 mountNav("nagare");
 import { FlowRenderer, speedColor } from "./render";
@@ -24,14 +25,16 @@ const legendCanvas = document.getElementById("legend-ramp") as HTMLCanvasElement
 const legendMax = document.getElementById("legend-max")!;
 const tooltip = document.getElementById("tooltip")!;
 const drawerToggle = document.getElementById("drawer-toggle") as HTMLButtonElement;
-const drawerOverlay = document.getElementById("drawer-overlay")!;
-const drawerEl = document.getElementById("area-drawer")!;
+const drawerEl = document.getElementById("area-drawer") as HTMLDialogElement;
+const drawerChips = document.getElementById("area-drawer-chips")!;
+const drawerClose = document.getElementById("drawer-close") as HTMLButtonElement;
 const kbHint = document.getElementById("kb-hint")!;
 
-// prefers-reduced-motion
-const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-const renderer = new FlowRenderer(canvas, reducedMotion);
+// 動きを減らす設定・「とめる」ボタンのときは静止速度マップで描く（motion.ts）
+const renderer = new FlowRenderer(canvas, !motionAllowed());
+let loop: AmbientLoop | null = null;
+/** 静止中だけ1枚描き直す（アニメーション中は次フレームで反映される） */
+const redraw = () => loop?.redraw();
 
 // ---- 時間軸 ----------------------------------------------------------
 const STEP_MS = TIME_STEP_MIN * 60_000;
@@ -99,7 +102,7 @@ async function applyHead() {
     renderer.setFields(fa, fieldCache.get(fieldKey(currentArea, s1)) ?? null, head - s0);
     statusEl.textContent = "";
     updateLegend();
-    if (reducedMotion) renderer.frame(0);
+    redraw();
     // 次のフレームを先読み
     void loadField(currentArea, s1).then(() => {
       if (myEpoch !== epoch || !currentArea) return;
@@ -107,7 +110,7 @@ async function applyHead() {
       const f1 = fieldCache.get(fieldKey(currentArea, Math.min(Math.floor(head) + 1, steps)));
       if (f0) {
         renderer.setFields(f0, f1 ?? null, head - Math.floor(head));
-        if (reducedMotion) renderer.frame(0);
+        redraw();
       }
     });
   } catch (e) {
@@ -205,21 +208,29 @@ shareBtn.addEventListener("click", async () => {
   }, "image/png");
 });
 
-// E-1: ドロワー開閉
+// E-1: ドロワー開閉（モーダル <dialog>）
 function openDrawer() {
-  drawerEl.classList.add("open");
-  drawerOverlay.classList.add("visible");
+  drawerEl.showModal();
   drawerToggle.setAttribute("aria-expanded", "true");
 }
 function closeDrawer() {
-  drawerEl.classList.remove("open");
-  drawerOverlay.classList.remove("visible");
-  drawerToggle.setAttribute("aria-expanded", "false");
+  drawerEl.close();
 }
-drawerToggle.addEventListener("click", () => {
-  drawerEl.classList.contains("open") ? closeDrawer() : openDrawer();
-});
-drawerOverlay.addEventListener("click", closeDrawer);
+// Esc・戻るジェスチャ・背景タップ（closedby="any"）を含む、あらゆる閉じ方で状態を戻す
+drawerEl.addEventListener("close", () => drawerToggle.setAttribute("aria-expanded", "false"));
+drawerToggle.addEventListener("click", openDrawer);
+drawerClose.addEventListener("click", closeDrawer);
+// closedby 未対応（Safari）では背景タップで閉じない。押下と離す位置が両方シートの外なら閉じる
+if (!("closedBy" in HTMLDialogElement.prototype)) {
+  // event.target ではなく座標で判定する（シートの余白も target が <dialog> になるため）
+  const outside = (e: PointerEvent) => {
+    const r = drawerEl.getBoundingClientRect();
+    return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+  };
+  let pressedOutside = false;
+  drawerEl.addEventListener("pointerdown", (e) => { pressedOutside = outside(e); });
+  drawerEl.addEventListener("pointerup", (e) => { if (pressedOutside && outside(e)) closeDrawer(); });
+}
 
 // B-2: キーボードショートカット
 // 初回5秒でヒントを非表示
@@ -259,14 +270,12 @@ canvas.addEventListener("pointerleave", () => tooltip.classList.remove("visible"
 
 window.addEventListener("resize", () => {
   renderer.resize();
-  if (reducedMotion) renderer.frame(0);
+  redraw();
 });
 
 // ---- メインループ ----------------------------------------------------
-let lastTs = performance.now();
-function tick(ts: number) {
-  const dt = Math.min((ts - lastTs) / 1000, 0.1);
-  lastTs = ts;
+function frame(_ts: number, dt: number) {
+  renderer.setReducedMotion(false);
   if (playing && currentArea) {
     // 実時間1秒 ≈ 潮流3分。30分刻み1コマ ≈ 10秒
     const prev = head;
@@ -281,7 +290,10 @@ function tick(ts: number) {
     }
   }
   renderer.frame(dt);
-  requestAnimationFrame(tick);
+}
+function still() {
+  renderer.setReducedMotion(true);
+  renderer.frame(0);
 }
 // ---- 起動 ------------------------------------------------------------
 async function boot() {
@@ -306,7 +318,7 @@ async function boot() {
     dc.dataset.code = a.code;
     dc.textContent = a.nameJa;
     dc.addEventListener("click", () => { void selectArea(a); closeDrawer(); });
-    drawerEl.appendChild(dc);
+    drawerChips.appendChild(dc);
   }
   // B-1: URLハッシュから初期海域を選ぶ（なければ来島海峡 S01）
   const hashCode = location.hash.slice(1);
@@ -314,11 +326,7 @@ async function boot() {
     ?? areas.find((a) => a.code === "S01")
     ?? areas[0];
   await selectArea(initial);
-  if (!reducedMotion) requestAnimationFrame(tick);
-  else {
-    // reduced motion: アニメなしで1枚だけ描画
-    renderer.frame(0);
-  }
+  loop = ambientLoop(frame, still);
 }
 
 void boot();

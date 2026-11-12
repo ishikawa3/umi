@@ -2,6 +2,7 @@ import "./style.css";
 import { arcgisQuery } from "./api";
 import { JapanMap, JAPAN_BBOX } from "./japanmap";
 import { mountNav } from "./nav";
+import { ambientLoop } from "./motion";
 
 mountNav("suji");
 
@@ -10,7 +11,6 @@ const statusEl = document.getElementById("status")!;
 const infoEl = document.getElementById("cable-info")!;
 
 const map = new JapanMap(canvas, JAPAN_BBOX);
-const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 interface ScreenPath {
   pts: Float32Array; // x0,y0,x1,y1,...
@@ -143,10 +143,7 @@ function drawBaseLines(ctx: CanvasRenderingContext2D) {
   ctx.globalCompositeOperation = "source-over";
 }
 
-let lastTs = performance.now();
-function tick(ts: number) {
-  const dt = Math.min((ts - lastTs) / 1000, 0.1);
-  lastTs = ts;
+function frame(_ts: number, dt: number) {
   const ctx = map.ctx;
 
   // 背景静止画へ向かって残像をフェードさせ、その上に微光を重ねる
@@ -180,14 +177,13 @@ function tick(ts: number) {
     ctx.stroke();
   }
   ctx.globalCompositeOperation = "source-over";
-  requestAnimationFrame(tick);
 }
 
 window.addEventListener("resize", () => {
   map.resize();
   projectPaths();
   rebuildBase();
-  if (!reducedMotion) seedParticles();
+  seedParticles();
 });
 
 // ---- 起動 --------------------------------------------------------------
@@ -209,9 +205,9 @@ async function boot() {
   infoEl.textContent = `日本近海の海底ケーブル ${cableCount.toLocaleString()} 経路`;
   projectPaths();
   rebuildBase();
-  if (reducedMotion) return; // アニメなし: ケーブル網の静止画のみ
   seedParticles();
-  requestAnimationFrame(tick);
+  // 静止時は rebuildBase が描いたケーブル網の静止画をそのまま見せる
+  ambientLoop(frame, () => {});
 }
 
 void boot();

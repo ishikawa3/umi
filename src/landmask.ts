@@ -3,7 +3,12 @@
  * 海しるAPIは海上の推算地点しか持たないため、陸の判定はこのマスクで行う。
  * 海色 ≈ rgb(190, 210, 255)。地名文字・境界線で開く小穴はクロージングで埋める。
  * タイル取得に失敗した場合は null（マスクなし＝従来動作）にフォールバック。
+ *
+ * マスクは最大で数百万ピクセルあり、判定とクロージングを一気に回すと数百msの
+ * 長いタスクになって海域チップのタップ等への反応（INP）を悪くする。
+ * 行単位のループの途中で yielder() によりメインスレッドへ処理を譲る。
  */
+import { yielder } from "./yield";
 
 const TILE_URL = (z: number, x: number, y: number) =>
   `https://cyberjapandata.gsi.go.jp/xyz/pale/${z}/${x}/${y}.png`;
@@ -66,11 +71,13 @@ function loadTile(z: number, x: number, y: number): Promise<HTMLImageElement | n
 }
 
 /** 1=水域の二値マスクにクロージング（膨張→収縮）をかけて文字・線の穴を埋める */
-function close(mask: Uint8Array, w: number, h: number, r: number): Uint8Array {
-  const dilate = (src: Uint8Array, val: number) => {
+async function close(mask: Uint8Array, w: number, h: number, r: number): Promise<Uint8Array> {
+  const maybeYield = yielder();
+  const dilate = async (src: Uint8Array, val: number) => {
     const tmp = new Uint8Array(src.length);
     // 水平
     for (let y = 0; y < h; y++) {
+      await maybeYield();
       for (let x = 0; x < w; x++) {
         let hit = 0;
         for (let k = -r; k <= r; k++) {
@@ -83,6 +90,7 @@ function close(mask: Uint8Array, w: number, h: number, r: number): Uint8Array {
     // 垂直
     const out = new Uint8Array(tmp.length);
     for (let y = 0; y < h; y++) {
+      await maybeYield();
       for (let x = 0; x < w; x++) {
         let hit = 0;
         for (let k = -r; k <= r; k++) {
@@ -95,7 +103,7 @@ function close(mask: Uint8Array, w: number, h: number, r: number): Uint8Array {
     return out;
   };
   // 水域を膨張してから陸を膨張で戻す＝クロージング
-  return dilate(dilate(mask, 1), 0);
+  return dilate(await dilate(mask, 1), 0);
 }
 
 export async function buildLandMask(
@@ -148,14 +156,18 @@ export async function buildLandMask(
 
     const { data } = ctx.getImageData(0, 0, w, h);
     const mask = new Uint8Array(w * h);
-    for (let i = 0; i < w * h; i++) {
-      const r = data[i * 4];
-      const g = data[i * 4 + 1];
-      const b = data[i * 4 + 2];
-      // 淡色地図の海: 青みが強く明るい
-      mask[i] = b >= 225 && b - r >= 35 && b - g >= 22 ? 1 : 0;
+    const maybeYield = yielder();
+    for (let y = 0; y < h; y++) {
+      await maybeYield();
+      for (let i = y * w, end = i + w; i < end; i++) {
+        const r = data[i * 4];
+        const g = data[i * 4 + 1];
+        const b = data[i * 4 + 2];
+        // 淡色地図の海: 青みが強く明るい
+        mask[i] = b >= 225 && b - r >= 35 && b - g >= 22 ? 1 : 0;
+      }
     }
-    return new LandMask(close(mask, w, h, 3), w, h, px0, py0, z);
+    return new LandMask(await close(mask, w, h, 3), w, h, px0, py0, z);
   } catch (e) {
     console.warn("[landmask] build failed:", e);
     return null;

@@ -56,6 +56,11 @@ export class FlowRenderer {
     this.resize();
   }
 
+  /** 静止表示（ドット密度の速度マップ）と粒子アニメーションを切り替える */
+  setReducedMotion(on: boolean) {
+    this.reducedMotion = on;
+  }
+
   resize() {
     const w = this.canvas.clientWidth;
     const h = this.canvas.clientHeight;

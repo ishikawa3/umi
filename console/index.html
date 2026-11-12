@@ -20,6 +20,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="かいしょう" />
+    <!-- データ取得先へ早めに接続しておく（TLSハンドシェイクを先に済ませる） -->
+    <link rel="preconnect" href="https://api.msil.go.jp" crossorigin />
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {
@@ -46,7 +48,7 @@
 
     <!-- 本体: 左レイヤ / 中央3D海図 / 右インスペクタ -->
     <div class="body">
-      <aside class="panel left" aria-label="レイヤ・海域・凡例">
+      <aside class="panel left" id="panel-left" aria-label="レイヤ・海域・凡例">
         <h2>レイヤ</h2>
         <div id="layer-list"></div>
         <div id="warn-filter-section">
@@ -72,7 +74,7 @@
         </div>
       </main>
 
-      <aside class="panel right" aria-label="詳細パネル">
+      <aside class="panel right" id="panel-right" aria-label="詳細パネル">
         <div class="rp-tabs" id="rp-tabs"></div>
 
         <div class="rp-panel" id="rp-warnings">
@@ -111,8 +113,8 @@
     <!-- モバイル用: パネルをボトムシートで開くタブバー＋背景 -->
     <div id="m-backdrop" class="m-backdrop" aria-hidden="true"></div>
     <nav class="m-tabbar" aria-label="パネル切替">
-      <button id="m-layers" class="m-tab" type="button" aria-pressed="false">レイヤ</button>
-      <button id="m-detail" class="m-tab" type="button" aria-pressed="false">一覧・詳細</button>
+      <button id="m-layers" class="m-tab" type="button" aria-expanded="false" aria-controls="panel-left">レイヤ</button>
+      <button id="m-detail" class="m-tab" type="button" aria-expanded="false" aria-controls="panel-right">一覧・詳細</button>
     </nav>
 
     <div id="tooltip" role="tooltip"></div>

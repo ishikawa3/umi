@@ -139,10 +139,12 @@ const $sel = (sel: string): HTMLElement => {
 };
 const leftPanel = $sel(".panel.left");
 const rightPanel = $sel(".panel.right");
-/** 開閉状態は見た目(active)だけでなく aria-pressed にも反映する（読み上げ対応） */
+/** シート背後の領域。開いている間は inert にして操作・読み上げの対象から外す（タブバーは残す） */
+const behindSheets = [".hdr", ".chart", ".statusbar", ".credit"].map($sel);
+/** 開閉状態は見た目(active)だけでなく aria-expanded にも反映する（開閉ボタンなので pressed ではなく expanded） */
 function setTabState(btn: HTMLElement, open: boolean): void {
   btn.classList.toggle("active", open);
-  btn.setAttribute("aria-pressed", String(open));
+  btn.setAttribute("aria-expanded", String(open));
 }
 function closeSheets(): void {
   leftPanel.classList.remove("open");
@@ -150,17 +152,39 @@ function closeSheets(): void {
   mBackdrop.classList.remove("show");
   setTabState(mLayersBtn, false);
   setTabState(mDetailBtn, false);
+  for (const el of behindSheets) el.inert = false;
 }
 function toggleSheet(which: "left" | "right"): void {
   const panel = which === "left" ? leftPanel : rightPanel;
   const btn = which === "left" ? mLayersBtn : mDetailBtn;
   const wasOpen = panel.classList.contains("open");
   closeSheets();
-  if (!wasOpen) { panel.classList.add("open"); setTabState(btn, true); mBackdrop.classList.add("show"); }
+  if (wasOpen) return;
+  panel.classList.add("open");
+  setTabState(btn, true);
+  mBackdrop.classList.add("show");
+  for (const el of behindSheets) el.inert = true;
+  // キーボード利用時はシートの先頭へフォーカスを移す（タップ時はフォーカスリングを出さない）
+  if (!panel.hasAttribute("tabindex")) panel.tabIndex = -1;
+  panel.focus({ preventScroll: true });
+}
+/** 閉じたあとは開いたタブへフォーカスを戻す（フォーカスが消えた先で迷わないように） */
+function closeSheetsAndRestoreFocus(): void {
+  const btn = leftPanel.classList.contains("open") ? mLayersBtn
+    : rightPanel.classList.contains("open") ? mDetailBtn : null;
+  closeSheets();
+  btn?.focus();
 }
 mLayersBtn.addEventListener("click", () => toggleSheet("left"));
 mDetailBtn.addEventListener("click", () => toggleSheet("right"));
 mBackdrop.addEventListener("click", closeSheets);
+window.addEventListener("keydown", (ev) => {
+  if (ev.key === "Escape" && mBackdrop.classList.contains("show")) closeSheetsAndRestoreFocus();
+});
+// 開いたまま幅が広がって3カラム表示に戻ったら、inert などの状態も解除する
+window.matchMedia("(max-width: 820px)").addEventListener("change", (e) => {
+  if (!e.matches) closeSheets();
+});
 
 // ---- 時間軸（潮流用。config を流用） ------------------------------------
 const STEP_MS = TIME_STEP_MIN * 60_000;

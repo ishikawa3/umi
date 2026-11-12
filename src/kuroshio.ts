@@ -2,6 +2,7 @@ import "./style.css";
 import { arcgisQuery } from "./api";
 import { JapanMap, JAPAN_BBOX } from "./japanmap";
 import { mountNav } from "./nav";
+import { ambientLoop } from "./motion";
 
 mountNav("kuroshio");
 
@@ -164,10 +165,7 @@ function drawBaseLines(ctx: CanvasRenderingContext2D) {
   }
 }
 
-let lastTs = performance.now();
-function tick(ts: number) {
-  const dt = Math.min((ts - lastTs) / 1000, 0.1);
-  lastTs = ts;
+function frame(_ts: number, dt: number) {
   const ctx = map.ctx;
 
   // 背景静止画へ向かって残像をフェードさせ、その上に粒子を重ねる
@@ -208,7 +206,6 @@ function tick(ts: number) {
     ctx.stroke();
   }
   ctx.globalCompositeOperation = "source-over";
-  requestAnimationFrame(tick);
 }
 
 // ---- ホバー: 最寄りの流軸名を出す ------------------------------------
@@ -277,7 +274,8 @@ async function boot() {
   projectPaths();
   seedParticles();
   rebuildBase();
-  requestAnimationFrame(tick);
+  // 静止時は rebuildBase が描いた流軸の静止画をそのまま見せる
+  ambientLoop(frame, () => {});
 }
 
 void boot();
