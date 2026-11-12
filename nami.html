@@ -49,6 +49,11 @@
         });
       }
     </script>
+    <!-- データ取得先へ早めに接続しておく（TLSハンドシェイクを先に済ませる） -->
+    <link rel="preconnect" href="https://api.msil.go.jp" crossorigin />
+    <link rel="preconnect" href="https://cyberjapandata.gsi.go.jp" crossorigin />
+    <!-- 作品間の View Transitions: HUD の解析が終わるまで新しいページの描画を待つ -->
+    <link rel="expect" href="#status" blocking="render" />
   </head>
   <body>
     <canvas id="sea" aria-label="海上保安庁「海しる」波浪データによる日本近海の波の星図"></canvas>
@@ -63,6 +68,7 @@
         <a href="./michi.html">みち（航路）</a>
         <a href="./koori.html">こおり（海氷）</a>
         <a href="./suji.html">すじ（海底ケーブル）</a>
+        <a href="./namae.html">なまえ（海底地形名）</a>
       </nav>
     </noscript>
 

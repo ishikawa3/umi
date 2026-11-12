@@ -2,6 +2,7 @@ import "./style.css";
 import { fetchNavWarnings } from "./api";
 import { JapanMap, JAPAN_BBOX } from "./japanmap";
 import { mountNav } from "./nav";
+import { ambientLoop, type AmbientLoop } from "./motion";
 
 mountNav("koe");
 
@@ -56,6 +57,14 @@ let warnings: Warning[] = [];
 let highlighted: Warning | null = null;
 // D-2: アクティブなフィルタ（null = 全件表示）
 let activeFilter: string | null = null;
+let loop: AmbientLoop | null = null;
+/** 静止中（動きを減らす設定・停止ボタン）でもハイライト等の変化は描き直す */
+const redraw = () => loop?.redraw();
+function setHighlight(w: Warning | null) {
+  if (highlighted === w) return;
+  highlighted = w;
+  redraw();
+}
 
 // ---- 描画 --------------------------------------------------------------
 function visibleWarnings(): Warning[] {
@@ -63,7 +72,7 @@ function visibleWarnings(): Warning[] {
   return warnings.filter((w) => w.category.key === activeFilter);
 }
 
-function tick(ts: number) {
+function frame(ts: number) {
   map.drawBase();
   const ctx = map.ctx;
   ctx.globalCompositeOperation = "lighter";
@@ -90,7 +99,6 @@ function tick(ts: number) {
     }
   }
   ctx.globalCompositeOperation = "source-over";
-  requestAnimationFrame(tick);
 }
 
 // ---- リストとの連動 ------------------------------------------------------
@@ -109,8 +117,8 @@ function buildList() {
     el.style.color = `rgba(${w.category.color}, 0.85)`;
     // "06-260085 豊後水道、灯台消灯" → 番号部を落として本文だけ
     el.textContent = w.name.replace(/^\S+\s*/, "");
-    el.addEventListener("pointerenter", () => (highlighted = w));
-    el.addEventListener("pointerleave", () => (highlighted = null));
+    el.addEventListener("pointerenter", () => setHighlight(w));
+    el.addEventListener("pointerleave", () => setHighlight(null));
     el.addEventListener("click", () => openPanel(w));
     listEl.appendChild(el);
   }
@@ -145,6 +153,7 @@ function refreshFilter() {
   buildFilterChips();
   buildList();
   countEl.textContent = `有効な警報 ${visibleWarnings().length}件`;
+  redraw();
 }
 
 function nearestWarning(cssX: number, cssY: number, maxCss: number): Warning | null {
@@ -163,7 +172,7 @@ function nearestWarning(cssX: number, cssY: number, maxCss: number): Warning | n
 
 canvas.addEventListener("pointermove", (ev) => {
   const w = nearestWarning(ev.clientX, ev.clientY, 14);
-  highlighted = w;
+  setHighlight(w);
   if (w) {
     tooltip.classList.add("visible");
     tooltip.style.left = `${ev.clientX + 14}px`;
@@ -175,7 +184,7 @@ canvas.addEventListener("pointermove", (ev) => {
 });
 canvas.addEventListener("pointerleave", () => {
   tooltip.classList.remove("visible");
-  highlighted = null;
+  setHighlight(null);
 });
 canvas.addEventListener("click", (ev) => {
   const w = nearestWarning(ev.clientX, ev.clientY, 14);
@@ -185,7 +194,10 @@ panelClose.addEventListener("click", () => (panel.hidden = true));
 window.addEventListener("keydown", (ev) => {
   if (ev.key === "Escape") panel.hidden = true;
 });
-window.addEventListener("resize", () => map.resize());
+window.addEventListener("resize", () => {
+  map.resize();
+  redraw();
+});
 
 // ---- 起動 --------------------------------------------------------------
 async function boot() {
@@ -206,7 +218,7 @@ async function boot() {
   countEl.textContent = `有効な警報 ${warnings.length}件`;
   buildFilterChips();
   buildList();
-  requestAnimationFrame(tick);
+  loop = ambientLoop(frame);
 }
 
 void boot();

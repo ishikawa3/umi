@@ -453,15 +453,18 @@ body {
 .ticker-inner {
   display: inline-block;
   white-space: nowrap;
-  will-change: transform;
-  animation: ticker-scroll 60s linear infinite;
+  /* 動きを減らす設定では流さない（既定は静止、許可されたときだけ流す） */
+  @media (prefers-reduced-motion: no-preference) {
+    will-change: transform;
+    animation: ticker-scroll 60s linear infinite;
+  }
 }
+/* 読もうとしてポインタを載せた／フォーカスしたら止める（WCAG 2.2.2） */
+.statusbar .ticker:hover .ticker-inner,
+.statusbar .ticker:focus-within .ticker-inner { animation-play-state: paused; }
 @keyframes ticker-scroll {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .ticker-inner { animation: none; }
 }
 
 /* ---- クレジット（法的義務・常時表示） ---- */
@@ -555,14 +558,24 @@ body {
     left: 0; right: 0; bottom: 46px; top: auto;
     height: min(72vh, 540px);
     transform: translateY(calc(100% + 46px)); /* 画面外へ隠す */
-    transition: transform 0.26s ease;
+    /* 画面外のシートにキーボード／読み上げが入り込まないよう visibility でも隠す。
+       閉じるときはスライドが終わってから hidden にする */
+    visibility: hidden;
+    transition: transform 0.26s ease, visibility 0s linear 0.26s;
     z-index: 30;
     border: none;
     border-top: 1px solid var(--line);
     border-radius: 14px 14px 0 0;
     box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.55);
   }
-  .panel.left.open, .panel.right.open { transform: translateY(0); }
+  .panel.left.open, .panel.right.open {
+    transform: translateY(0);
+    visibility: visible;
+    transition: transform 0.26s ease, visibility 0s;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .panel.left, .panel.right, .panel.left.open, .panel.right.open { transition: none; }
+  }
 
   .m-tabbar { display: flex; }
   .m-backdrop.show { display: block; }

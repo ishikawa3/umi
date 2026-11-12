@@ -20,7 +20,7 @@ function pwaPrecache(): Plugin {
       // うみは複数ページ、かいしょうは console/ 配下の1ページ
       const apps = [
         { sw: join(dist, "sw.js"), html: ["index.html", "kuroshio.html", "tide.html", "koe.html",
-            "nemuri.html", "nami.html", "michi.html", "koori.html", "suji.html"] },
+            "nemuri.html", "nami.html", "michi.html", "koori.html", "suji.html", "namae.html"] },
         { sw: join(dist, "console", "sw.js"), html: [join("console", "index.html")] },
       ];
       for (const app of apps) {
@@ -71,6 +71,7 @@ export default defineConfig({
         michi: resolve(__dirname, "michi.html"),
         koori: resolve(__dirname, "koori.html"),
         suji: resolve(__dirname, "suji.html"),
+        namae: resolve(__dirname, "namae.html"),
         // かいしょう（業務システム風・three.js）は独立サイトとして同居（PLAN4）
         console: resolve(__dirname, "console/index.html"),
       },

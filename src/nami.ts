@@ -122,7 +122,10 @@ async function boot() {
     drawLegend();
     drawWaves();
   } catch {
-    statusEl.textContent = "海しるAPIに接続できませんでした";
+    // 2026年11月時点で wave-analysis は海しるのAPI一覧から消え、404 を返す。
+    // その 404 には CORS ヘッダが無く、ブラウザからは接続失敗と区別できないため、
+    // 一時的な不調に見せず、わかっている事実をそのまま伝える
+    statusEl.textContent = "波浪データを取得できませんでした（海しるの波浪データは2026年11月時点で提供が止まっています）";
   }
 }
 

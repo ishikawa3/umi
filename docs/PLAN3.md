@@ -60,6 +60,30 @@ maps.gsi.go.jp
 - `api.ts` — `msilFetch`（429リトライ内蔵・**必ず経由**）、`arcgisQuery(path, layer, bbox, extra?)`、
   `toMsilTime` / `toMsilDate`（JST変換）
 
+### 2026年11月の確認結果（管理APIの一覧 233件・ArcGIS Feature/ImageService の識別子一覧）
+
+- **海面水温・海上風・領海/EEZ のデータ層は見つからない**（`水温 [リンク]` はリンク集のみ。
+  `quick-bulletin` の層は流軸 6〜9 のみ）。→ フェーズ8 みなも・9 かぜ・13 さかい は実装を見送り
+- **`wave-analysis/v2`（なみ）は一覧から消え、404 を返す**。なみは現在データを表示できない
+- `monthly-vessel-traffic-amount/v2` の export は全域1400pxだと描画に約40秒かかり、約30秒で
+  打ち切られる（CORSヘッダ無しのエラーになる）。みちは 3×3 タイルに分けて取得している
+- 代わりの新作として海底地形名（点・線・面、`呼称の由来` 付き）で **なまえ** を追加した
+
+### 海しるAPI v3（2026/10/30 正式版。v2 は 2027年12月末に提供終了予定）
+
+- 情報源: ポータルのお知らせ、[v3 リリースノート](https://www.msil.go.jp/data/api/v3-release/)、
+  同ページの「最新の移行対応表」PDF。**波浪は移行対応表に載っていない**（後継なし）→ なみはナビから外した
+- FeatureService のURLは `https://api.msil.go.jp/arcgis/rest/services/FeatureService/v3/{サービス名}/FeatureServer/{層}/query`
+  （サービス名は移行対応表の「移行先 v3 API」。1回あたり最大2000件）。層番号・属性名は v2 と違う:
+  - 沈船 `wreck`: 点が層20（層1は面）／海底ケーブル `submarine_cable`: 線が層0
+  - 海底地形名 `undersea_feature_name`: 点0・線1・面2。属性は `jcufn_approved` など小文字化。
+    公式の分類 `由来分類`（地理的名称・元号・鳥・七草・天文・人名…）が加わった（末尾の空白・改行や `<NULL>` が混じる）
+  - 等深線 `depth_contour`: 1層にまとまり `depth` 属性。v2 の層10〜14（20/50/100/150/200m）の合計と件数が一致
+- ImageService は `…/ImageService/v3/{識別子}/ImageServer/exportImage`（2026/11/12 ベータ版）。
+  `vessel_traffic_2024` は16ビットの通航量の値で、`renderingRule={"rasterFunction":"vessel_traffic_raster_template"}`
+  で書き出すと v2 と同じ4色（青・緑・橙・赤）に色付けされる。みちはこれを使い、取れなければ v2 の2020年に戻る
+- 海洋速報（くろしお）・海氷（こおり）・航行警報（こえ・かいしょう）は v3 の提供方法が「検討中」。v2 のまま待つ
+
 ---
 
 ## フェーズ8: みなも — 海の体温（海面水温）★signature

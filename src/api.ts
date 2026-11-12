@@ -22,32 +22,65 @@ export interface ContourLine {
   paths: [number, number][][];
 }
 
+/** 海しるAPIが非OKのHTTPステータスを返した（CORSヘッダ付きで応答が読めた場合） */
+export class MsilHttpError extends Error {
+  constructor(readonly status: number, url: URL) {
+    super(`MSIL API ${status}: ${url}`);
+    this.name = "MsilHttpError";
+  }
+}
+
 /**
  * 海しるAPIへの生アクセス。429を指数バックオフでリトライし、非OKは例外化する。
  * バイナリ（画像export等）を扱うページはこの Response を直接使う。
  */
 export async function msilFetchRaw(
   path: string,
-  params?: Record<string, string>
+  params?: Record<string, string>,
+  signal?: AbortSignal
 ): Promise<Response> {
   const url = new URL(API_BASE + path);
   for (const [k, v] of Object.entries(params ?? {})) url.searchParams.set(k, v);
   for (let attempt = 0; ; attempt++) {
     const res = await fetch(url, {
       headers: { "Ocp-Apim-Subscription-Key": MSIL_KEY },
+      signal,
     });
     if (res.status === 429 && attempt < 3) {
       await new Promise((r) => setTimeout(r, 1200 * (attempt + 1)));
       continue;
     }
     // 認証キーはヘッダ送信でURLに含まれないため、クエリ込みのURLを出して追跡性を上げる
-    if (!res.ok) throw new Error(`MSIL API ${res.status}: ${url}`);
+    if (!res.ok) throw new MsilHttpError(res.status, url);
     return res;
   }
 }
 
 async function msilFetch(path: string, params?: Record<string, string>): Promise<any> {
-  return (await msilFetchRaw(path, params)).json();
+  const body = await (await msilFetchRaw(path, params)).json();
+  // ArcGIS はクエリの誤りや障害を HTTP 200 + {error:{...}} で返すことがある。
+  // 素通しすると features が無い＝「0件」に見えるので、エラーとして扱う
+  if (body && typeof body === "object" && body.error) {
+    throw new Error(`MSIL API error ${body.error.code ?? ""}: ${body.error.message ?? ""} (${path})`);
+  }
+  return body;
+}
+
+/** bbox（経緯度）で絞る ArcGIS クエリの共通パラメータ。v2 MapServer・v3 FeatureService 共通 */
+function envelopeQueryParams(
+  bbox: [number, number, number, number],
+  extra?: Record<string, string>
+): Record<string, string> {
+  const [xmin, ymin, xmax, ymax] = bbox;
+  return {
+    f: "geojson",
+    geometry: JSON.stringify({ xmin, ymin, xmax, ymax }),
+    geometryType: "esriGeometryEnvelope",
+    inSR: "4326",
+    outFields: "*",
+    returnGeometry: "true",
+    ...extra,
+  };
 }
 
 export async function fetchAreas(): Promise<Area[]> {
@@ -144,32 +177,68 @@ export async function arcgisQuery(
   bbox: [number, number, number, number],
   extra?: Record<string, string>
 ): Promise<any> {
-  const [xmin, ymin, xmax, ymax] = bbox;
-  return msilFetch(`/${path}/MapServer/${layer}/query`, {
-    f: "geojson",
-    geometry: JSON.stringify({ xmin, ymin, xmax, ymax }),
-    geometryType: "esriGeometryEnvelope",
-    inSR: "4326",
-    outFields: "*",
-    returnGeometry: "true",
-    ...extra,
-  });
+  return msilFetch(`/${path}/MapServer/${layer}/query`, envelopeQueryParams(bbox, extra));
 }
 
-/** 等深線（20m/50m/100m/150m/200m 層）を海域bboxで取得 */
+/**
+ * v3 API（ArcGIS FeatureService）の汎用クエリ。1回あたり最大2000件で、
+ * 超える分は resultOffset で続きを取り、全件を返す。
+ * v2 は2027年12月末に提供終了予定（海しるAPI v3 リリースノート）。
+ * v3 に移行先がある項目はこちらを使う。サービス名は移行対応表の「移行先 v3 API」。
+ * 層番号・属性名は v2 と異なる（例: 海底地形名は v2 の 1/2/3 → v3 の 0/1/2、属性は小文字化）。
+ * resultOffset でページを分けるので、ページ間で重複・欠落しないよう objectid 順に固定する。
+ */
+const MAX_PAGES = 20;
+export async function featureQueryAll(
+  service: string,
+  layer: number,
+  bbox: [number, number, number, number],
+  extra?: Record<string, string>,
+  onProgress?: (count: number) => void
+): Promise<any[]> {
+  const out: any[] = [];
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const gj = await msilFetch(
+      `/arcgis/rest/services/FeatureService/v3/${service}/FeatureServer/${layer}/query`,
+      envelopeQueryParams(bbox, {
+        where: "1=1",
+        outSR: "4326",
+        orderByFields: "objectid",
+        resultOffset: String(out.length),
+        ...extra,
+      })
+    );
+    const fs: any[] = gj.features ?? [];
+    out.push(...fs);
+    onProgress?.(out.length);
+    // GeoJSON 出力では properties の下に入る
+    const exceeded = gj.exceededTransferLimit ?? gj.properties?.exceededTransferLimit;
+    if (!exceeded || fs.length === 0) return out;
+  }
+  // 上限に達してもまだ続きがある: 一部だけを全件のように見せない
+  throw new Error(`featureQueryAll: ${service}/${layer} が ${MAX_PAGES} ページを超えました`);
+}
+
+/**
+ * 等深線（20m/50m/100m/150m/200m）を海域bboxで取得（v3: 1層に depth 属性でまとまっている）。
+ * 深さごとに別々に取り、取れなかった深さだけを欠かす（1回の失敗で全部の等深線を失わない。v2 の層ごと取得と同じ）
+ */
+const CONTOUR_DEPTHS = [20, 50, 100, 150, 200];
 export async function fetchContours(bbox: [number, number, number, number]): Promise<ContourLine[]> {
-  const layers = [10, 11, 12, 13, 14];
   const results = await Promise.allSettled(
-    layers.map((layer) => arcgisQuery("depth-contour/v2", layer, bbox, { outFields: "Depth" }))
+    CONTOUR_DEPTHS.map((d) =>
+      featureQueryAll("depth_contour", 0, bbox, { outFields: "depth", where: `depth = ${d}` })
+    )
   );
   const lines: ContourLine[] = [];
   for (const r of results) {
-    if (r.status !== "fulfilled" || !r.value.features) continue;
-    for (const f of r.value.features) {
+    if (r.status !== "fulfilled") continue;
+    for (const f of r.value) {
       const g = f.geometry;
+      if (!g) continue;
       const paths: [number, number][][] =
         g.type === "MultiLineString" ? g.coordinates : [g.coordinates];
-      lines.push({ depth: f.properties.Depth, paths });
+      lines.push({ depth: f.properties.depth, paths });
     }
   }
   return lines;
