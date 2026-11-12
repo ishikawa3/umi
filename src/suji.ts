@@ -200,8 +200,10 @@ async function boot() {
   projectPaths();
   rebuildBase();
   seedParticles();
-  // 静止時は rebuildBase が描いたケーブル網の静止画をそのまま見せる
-  ambientLoop(frame, () => {});
+  // 静止時はケーブル網の静止画（base）に描き直す（微光の残像を残したまま止めない）
+  ambientLoop(frame, () => {
+    if (base) map.ctx.drawImage(base, 0, 0);
+  });
 }
 
 void boot();

@@ -177,7 +177,8 @@ function closeSheetsAndRestoreFocus(): void {
 }
 mLayersBtn.addEventListener("click", () => toggleSheet("left"));
 mDetailBtn.addEventListener("click", () => toggleSheet("right"));
-mBackdrop.addEventListener("click", closeSheets);
+// 背景タップで閉じたときも、シート内にあったフォーカスをタブへ戻す
+mBackdrop.addEventListener("click", closeSheetsAndRestoreFocus);
 window.addEventListener("keydown", (ev) => {
   if (ev.key === "Escape" && mBackdrop.classList.contains("show")) closeSheetsAndRestoreFocus();
 });

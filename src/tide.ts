@@ -7,6 +7,7 @@ import { JapanMap, JAPAN_BBOX } from "./japanmap";
 import { speedColor } from "./render";
 import { moonAge, tideName, drawMoon } from "./moon";
 import { mountNav } from "./nav";
+import { motionAllowed } from "./motion";
 
 mountNav("shiodoki");
 
@@ -35,8 +36,8 @@ let shown: TideStation[] = []; // 間引き後の表示地点
 const tideCache = new Map<string, TideDay>();
 let selected: TideStation | null = null;
 let head = 0; // 現在時刻（分, 0..1439, 小数可）
-// 動きを減らす設定では一時停止で始める（▶ で再生できる）
-let playing = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+// 動きを減らす設定・「とめる」を選んだ人は一時停止で始める（▶ で再生できる）。ながれと同じ判定
+let playing = motionAllowed();
 
 // C-1: 日付オフセット（0=今日, -1=昨日, +1=明日）
 let dateOffset = 0;

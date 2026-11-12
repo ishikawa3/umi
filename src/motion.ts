@@ -60,7 +60,9 @@ export function ambientLoop(
   const drawStill = () => (still ? still() : frame(lastTs, 0));
 
   const tick = (ts: number) => {
-    const dt = Math.min((ts - lastTs) / 1000, 0.1);
+    // 再開直後の最初の rAF の ts（フレーム開始時刻）は、直前に記録した performance.now() より
+    // 前になりうる。負の dt で時刻や粒子が逆戻りしないよう 0 以上に丸める
+    const dt = Math.min(Math.max(0, (ts - lastTs) / 1000), 0.1);
     lastTs = ts;
     frame(ts, dt);
     raf = requestAnimationFrame(tick);
@@ -86,8 +88,9 @@ export function ambientLoop(
   btn.className = "motion-toggle";
   const syncButton = () => {
     // ラベル自体が状態を表すので aria-pressed は付けない（「押された うごかす」と読まれるため）
+    // 読み上げ名には表示中の文字をそのまま含める（音声操作で「とめる」と言って押せるように。WCAG 2.5.3）
     btn.textContent = running ? "とめる" : "うごかす";
-    btn.setAttribute("aria-label", running ? "アニメーションを止める" : "アニメーションを動かす");
+    btn.setAttribute("aria-label", running ? "とめる（アニメーション）" : "うごかす（アニメーション）");
   };
   btn.addEventListener("click", () => {
     const next: Choice = running ? "pause" : "play";

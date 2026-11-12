@@ -144,14 +144,15 @@ let activeIdx: Int32Array | null = null;
  * 全域を1枚（1400px）で export させると海しる側の描画に約40秒かかり、
  * 約30秒で中継側に打ち切られる（CORSヘッダの無いエラーになり、ブラウザでは取得失敗）。
  * 3×3 に分けて並行に取る（1枚あたり数秒）。それでも描画時間にはばらつきがあり、
- * まれに1枚だけ打ち切られるので、失敗したタイルは1回だけ取り直す。
+ * まれに1枚だけ打ち切られるので、打ち切り（ブラウザでは CORS 失敗＝TypeError に見える）と
+ * 5xx のタイルだけ1回取り直す。4xx などの直らない失敗は取り直さず、すぐ次の取得元へ移る。
  * 画像は経緯度座標系（imageSR=4326）なので、ピクセル境界から各タイルの bbox を
  * 線形に求めれば継ぎ目なくつながる。
  */
 const TILE_SPLIT = 3;
 
 async function loadTile(
-  src: TrafficSource, c0: number, c1: number, r0: number, r1: number
+  src: TrafficSource, c0: number, c1: number, r0: number, r1: number, signal: AbortSignal
 ): Promise<ImageBitmap> {
   const lon0 = BB_X0 + (c0 / RASTER_W) * LON_SPAN;
   const lon1 = BB_X0 + (c1 / RASTER_W) * LON_SPAN;
@@ -166,8 +167,15 @@ async function loadTile(
     size: `${c1 - c0},${r1 - r0}`,
     f: "image",
     ...src.params,
-  });
+  }, signal);
   return createImageBitmap(await res.blob());
+}
+
+/** 取り直す価値のある失敗か（中継の打ち切り・ネットワーク断・5xx） */
+function retryable(e: unknown, signal: AbortSignal): boolean {
+  if (signal.aborted) return false;
+  if (e instanceof TypeError) return true;
+  return /MSIL API 5\d\d/.test(String(e));
 }
 
 async function loadTraffic(src: TrafficSource): Promise<void> {
@@ -180,16 +188,27 @@ async function loadTraffic(src: TrafficSource): Promise<void> {
     Array.from({ length: TILE_SPLIT + 1 }, (_, i) => Math.round((n * i) / TILE_SPLIT));
   const cols = cuts(RASTER_W);
   const rows = cuts(RASTER_H);
+  // 1枚でも取れなければこの取得元は諦めるので、残りのタイル（と取り直し）も止める。
+  // 止めないと、次の取得元へ移ったあとも裏で要求が続き、429 や遅延の原因になる
+  const ctrl = new AbortController();
+  const { signal } = ctrl;
   const jobs: Promise<void>[] = [];
   for (let i = 0; i < TILE_SPLIT; i++) {
     for (let j = 0; j < TILE_SPLIT; j++) {
       const [c0, c1, r0, r1] = [cols[i], cols[i + 1], rows[j], rows[j + 1]];
       jobs.push(
-        loadTile(src, c0, c1, r0, r1)
-          .catch(() => loadTile(src, c0, c1, r0, r1)) // 打ち切られたタイルを1回だけ取り直す
+        loadTile(src, c0, c1, r0, r1, signal)
+          .catch((e) => {
+            if (!retryable(e, signal)) throw e;
+            return loadTile(src, c0, c1, r0, r1, signal); // 1回だけ取り直す
+          })
           .then((bmp) => {
-            octx.drawImage(bmp, c0, r0, c1 - c0, r1 - r0);
+            if (!signal.aborted) octx.drawImage(bmp, c0, r0, c1 - c0, r1 - r0);
             bmp.close(); // 描いたら不要。export 画像を早期に解放する
+          })
+          .catch((e) => {
+            ctrl.abort();
+            throw e;
           })
       );
     }

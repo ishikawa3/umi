@@ -274,8 +274,10 @@ async function boot() {
   projectPaths();
   seedParticles();
   rebuildBase();
-  // 静止時は rebuildBase が描いた流軸の静止画をそのまま見せる
-  ambientLoop(frame, () => {});
+  // 静止時は流軸の静止画（base）に描き直す（粒子の残像を残したまま止めない）
+  ambientLoop(frame, () => {
+    if (base) map.ctx.drawImage(base, 0, 0);
+  });
 }
 
 void boot();

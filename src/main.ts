@@ -310,8 +310,10 @@ function still() {
 }
 // 静止表示中の再生: 粒子は動かさず、30分刻みのコマを約10秒ごとに進める
 // （アニメーション中と同じ速さ。「とめる」は動きを止めるもので、時刻の再生とは別）
+// アニメーション中は frame が進めるので、ここは静止中だけ動く（同時に2経路で進めない）。
+// 裏のタブでは rAF と同じく止める（見えないのに10秒ごとに潮流データを取りに行かない）
 setInterval(() => {
-  if (!playing || !currentArea || !loop || loop.running) return;
+  if (!playing || !currentArea || !loop || loop.running || document.hidden) return;
   head = Math.floor(head) + 1;
   if (head > steps) head = 0;
   timeSlider.value = String(head);
