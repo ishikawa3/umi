@@ -2,7 +2,7 @@ import "./style.css";
 import { JapanMap, JAPAN_BBOX } from "./japanmap";
 import { speedColor } from "./render";
 import { mountNav } from "./nav";
-import { msilFetchRaw, MsilHttpError } from "./api";
+import { fetchTrafficRaster, activeIndices, TRAFFIC_CLASS_LABEL } from "./traffic-raster";
 
 mountNav("michi");
 
@@ -15,48 +15,12 @@ const tooltip = document.getElementById("tooltip")!;
 
 const map = new JapanMap(canvas, JAPAN_BBOX);
 
-// 船舶通航量（AIS統計）の取得元。年単位の統計で、新しい順に試す。
-// - 2024年: 海しるAPI v3 の ArcGIS ImageService（2026/11 時点でベータ版）。
-//   公式のラスター関数 vessel_traffic_raster_template で、2020年版と同じ4色に色付けして書き出す
-// - 2020年: v2（2017–2020 のみ。2027年12月末に提供終了予定）。ベータ版が使えないときの控え
-interface TrafficSource {
-  year: string;
-  path: string;
-  params: Record<string, string>;
-}
-const SOURCES: TrafficSource[] = [
-  {
-    year: "2024",
-    path: "/arcgis/rest/services/ImageService/v3/vessel_traffic_2024/ImageServer/exportImage",
-    params: {
-      format: "png32",
-      renderingRule: JSON.stringify({ rasterFunction: "vessel_traffic_raster_template" }),
-      // 分類は色の一致で行うので、補間で中間色を作らせない
-      interpolation: "RSP_NearestNeighbor",
-    },
-  },
-  {
-    year: "2020",
-    path: "/monthly-vessel-traffic-amount/v2/2020/MapServer/export",
-    // 分類前提のロスレスなパレットPNGを固定する
-    params: { format: "png8", layers: "show:0" },
-  },
-];
 // 密度ラスタの取得解像度。JAPAN_BBOX の縦横比（経度26° × 緯度22°）に合わせる。
 const [BB_X0, BB_Y0, BB_X1, BB_Y1] = JAPAN_BBOX;
 const LON_SPAN = BB_X1 - BB_X0; // 26
 const LAT_SPAN = BB_Y1 - BB_Y0; // 22
 const RASTER_W = 1400;
 const RASTER_H = Math.round((RASTER_W * LAT_SPAN) / LON_SPAN);
-
-// 公式ラスタの5色パレット → 通航量の4クラス（低→高）。白は背景（無データ）。
-const CLASS_COLORS: { rgb: [number, number, number]; cls: number }[] = [
-  { rgb: [0, 112, 255], cls: 1 }, // 青 = 閑散
-  { rgb: [152, 230, 0], cls: 2 }, // 緑 = 中
-  { rgb: [255, 170, 0], cls: 3 }, // 橙 = 多い
-  { rgb: [214, 47, 39], cls: 4 }, // 赤 = 過密
-];
-const CLASS_LABEL = ["閑散", "中", "多い", "過密"];
 
 const TWO_PI = Math.PI * 2;
 
@@ -108,26 +72,6 @@ const CLASS_SPRITE: ClassSprite[] = CLASS_STYLE.map((st): ClassSprite => {
   return { canvas: cv, c };
 });
 
-/** ピクセルRGB → クラス(1..4)。背景(白)や不明色は 0。 */
-function classify(r: number, g: number, b: number): number {
-  // 白背景（253,253,253 近傍）は無データ
-  if (r > 235 && g > 235 && b > 235) return 0;
-  let best = 0;
-  let bestD = Infinity;
-  for (const c of CLASS_COLORS) {
-    const dr = r - c.rgb[0];
-    const dg = g - c.rgb[1];
-    const db = b - c.rgb[2];
-    const d = dr * dr + dg * dg + db * db;
-    if (d < bestD) {
-      bestD = d;
-      best = c.cls;
-    }
-  }
-  // どのクラス色にも遠すぎる（アンチエイリアス縁など）は捨てる
-  return bestD < 90 * 90 ? best : 0;
-}
-
 /** ラスタ pixel(col,row) → 経緯度（等緯度経度＝プレートカレー） */
 function pixelToLonLat(col: number, row: number): [number, number] {
   const lon = BB_X0 + ((col + 0.5) / RASTER_W) * LON_SPAN;
@@ -140,99 +84,12 @@ let grid: Uint8Array | null = null;
 // 非0（描画対象）画素のインデックス一覧。描画を O(非0画素数) にするため。
 let activeIdx: Int32Array | null = null;
 
-/**
- * 全域を1枚（1400px）で export させると海しる側の描画に約40秒かかり、
- * 約30秒で中継側に打ち切られる（CORSヘッダの無いエラーになり、ブラウザでは取得失敗）。
- * 3×3 に分けて並行に取る（1枚あたり数秒）。それでも描画時間にはばらつきがあり、
- * まれに1枚だけ打ち切られるので、中継の打ち切りと 5xx のタイルだけ1回取り直す。
- * 打ち切りも、CORS ヘッダの無い 4xx（海しるの 404 等）も、ブラウザからは同じ TypeError に見える。
- * 打ち切りは約30秒待たされてから起きるので、時間のかかった TypeError だけを打ち切りとみなす。
- * すぐに失敗したもの（直らない 4xx・オフライン）は取り直さず、すぐ次の取得元へ移る。
- * 画像は経緯度座標系（imageSR=4326）なので、ピクセル境界から各タイルの bbox を
- * 線形に求めれば継ぎ目なくつながる。
- */
-const TILE_SPLIT = 3;
-
-async function loadTile(
-  src: TrafficSource, c0: number, c1: number, r0: number, r1: number, signal: AbortSignal
-): Promise<ImageBitmap> {
-  const lon0 = BB_X0 + (c0 / RASTER_W) * LON_SPAN;
-  const lon1 = BB_X0 + (c1 / RASTER_W) * LON_SPAN;
-  const lat1 = BB_Y1 - (r0 / RASTER_H) * LAT_SPAN; // 行0が北端
-  const lat0 = BB_Y1 - (r1 / RASTER_H) * LAT_SPAN;
-  // 429リトライ・認証ヘッダ・非OK例外化を api.ts に集約（msilFetchRaw 経由）
-  const res = await msilFetchRaw(src.path, {
-    bbox: `${lon0},${lat0},${lon1},${lat1}`,
-    // bbox を経緯度で解釈させる（サーバのデフォルトSRに依存しない。arcgisQuery の inSR:"4326" と同思想）
-    bboxSR: "4326",
-    imageSR: "4326",
-    size: `${c1 - c0},${r1 - r0}`,
-    f: "image",
-    ...src.params,
-  }, signal);
-  return createImageBitmap(await res.blob());
-}
-
-/** 中継の打ち切りとみなす経過時間（打ち切りは約30秒後に起きる） */
-const CUTOFF_LIKE_MS = 15_000;
-
-/** 取り直す価値のある失敗か（中継の打ち切り・5xx） */
-function retryable(e: unknown, signal: AbortSignal, elapsedMs: number): boolean {
-  if (signal.aborted) return false;
-  if (e instanceof MsilHttpError) return e.status >= 500;
-  return e instanceof TypeError && elapsedMs >= CUTOFF_LIKE_MS;
-}
-
-async function loadTraffic(src: TrafficSource): Promise<void> {
-  // オフスクリーンにタイルを並べてからピクセルを読む
-  const off = document.createElement("canvas");
-  off.width = RASTER_W;
-  off.height = RASTER_H;
-  const octx = off.getContext("2d", { willReadFrequently: true })!;
-  const cuts = (n: number) =>
-    Array.from({ length: TILE_SPLIT + 1 }, (_, i) => Math.round((n * i) / TILE_SPLIT));
-  const cols = cuts(RASTER_W);
-  const rows = cuts(RASTER_H);
-  // 1枚でも取れなければこの取得元は諦めるので、残りのタイル（と取り直し）も止める。
-  // 止めないと、次の取得元へ移ったあとも裏で要求が続き、429 や遅延の原因になる
-  const ctrl = new AbortController();
-  const { signal } = ctrl;
-  const jobs: Promise<void>[] = [];
-  for (let i = 0; i < TILE_SPLIT; i++) {
-    for (let j = 0; j < TILE_SPLIT; j++) {
-      const [c0, c1, r0, r1] = [cols[i], cols[i + 1], rows[j], rows[j + 1]];
-      const t0 = performance.now();
-      jobs.push(
-        loadTile(src, c0, c1, r0, r1, signal)
-          .catch((e) => {
-            if (!retryable(e, signal, performance.now() - t0)) throw e;
-            return loadTile(src, c0, c1, r0, r1, signal); // 1回だけ取り直す
-          })
-          .then((bmp) => {
-            if (!signal.aborted) octx.drawImage(bmp, c0, r0, c1 - c0, r1 - r0);
-            bmp.close(); // 描いたら不要。export 画像を早期に解放する
-          })
-          .catch((e) => {
-            ctrl.abort();
-            throw e;
-          })
-      );
-    }
-  }
-  await Promise.all(jobs);
-  const data = octx.getImageData(0, 0, RASTER_W, RASTER_H).data;
-
-  const g = new Uint8Array(RASTER_W * RASTER_H);
-  const active: number[] = [];
-  for (let i = 0, p = 0; i < g.length; i++, p += 4) {
-    const cls = classify(data[p], data[p + 1], data[p + 2]);
-    if (cls !== 0) {
-      g[i] = cls;
-      active.push(i);
-    }
-  }
-  grid = g;
-  activeIdx = Int32Array.from(active);
+/** 通航量ラスタを取得して格子を差し替える。使えた年を返す */
+async function loadTraffic(): Promise<string> {
+  const { classes, year } = await fetchTrafficRaster(JAPAN_BBOX, RASTER_W, RASTER_H);
+  grid = classes;
+  activeIdx = activeIndices(classes);
+  return year;
 }
 
 // ---- 描画 ----------------------------------------------------------------
@@ -286,7 +143,7 @@ canvas.addEventListener("pointermove", (ev) => {
   tooltip.classList.add("visible");
   tooltip.style.left = `${ev.clientX + 14}px`;
   tooltip.style.top = `${ev.clientY + 14}px`;
-  tooltip.textContent = `通航 ${CLASS_LABEL[cls - 1]}`;
+  tooltip.textContent = `通航 ${TRAFFIC_CLASS_LABEL[cls - 1]}`;
 });
 canvas.addEventListener("pointerleave", () => tooltip.classList.remove("visible"));
 
@@ -309,17 +166,7 @@ async function boot() {
   statusEl.textContent = "船舶通航量データ取得中…";
   try {
     await map.init();
-    let year = "";
-    for (const src of SOURCES) {
-      try {
-        await loadTraffic(src);
-        year = src.year;
-        break;
-      } catch (e) {
-        console.warn(`[michi] ${src.year}年の通航量を取得できませんでした`, e);
-      }
-    }
-    if (!year) throw new Error("通航量を取得できませんでした");
+    const year = await loadTraffic();
     statusEl.textContent = "";
     metaEl.textContent = `AIS統計 ${year}年（海上保安庁）`;
     drawLegend();

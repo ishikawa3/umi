@@ -316,7 +316,11 @@ function updateLegend(): void {
     const r = waves.range();
     parts.push(legendBar("有義波高 m", "#1f5a68", "#eafffb", r.lo.toFixed(1), r.hi.toFixed(1)));
   }
-  if (traffic.isVisible()) parts.push(legendBar("通航量（4クラス）", "#1c5566", "#eafffd", "閑散", "過密"));
+  if (traffic.isVisible()) {
+    // 取得できた年（2024年、ベータ版が使えなければ2020年）を出す。取得前は年なし
+    const y = traffic.year();
+    parts.push(legendBar(y ? `通航量 ${y}年（4クラス）` : "通航量（4クラス）", "#1c5566", "#eafffd", "閑散", "過密"));
+  }
   legendSection.hidden = parts.length === 0;
   legendEl.innerHTML = parts.join("");
 }
